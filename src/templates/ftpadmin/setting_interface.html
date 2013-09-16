@@ -1,0 +1,29 @@
+{% extends "ftpadmin/setting_base.html" %}
+{% load i18n %}
+{% block title %}| {% trans "INTERFACE" %}{% endblock %}
+{% block header %}   {% endblock %}
+
+{% block content %}
+<br /> <br /> 
+<table>
+    <tr><td height="40">&nbsp;</td><td>&nbsp;</td></tr>
+</table>
+ 
+    <form method="post" action="">
+    <table align="center">
+      <th width="250px"><h2>{% trans "INTERFACE" %}</h2></th>
+      <tr><td> {% trans "language" %}: </td><td> <input type="text" name="language" value="{{ configuration.SITE_INTERFACE.language }}"></td></tr>
+      <tr><td>{% trans "site_style" %}:</td><td><input type="text" name="site_style" value="{{ configuration.SITE_INTERFACE.site_style  }}"></td></tr>
+      <tr><td>{% trans "show_log_items_each_page" %}: </td><td><input type="text" name="show_log_items_each_page" value="{{ configuration.SITE_INTERFACE.show_log_items_each_page  }}"></td></tr>
+      <tr><td>{% trans "show_ftpuser_items_each_page" %}:</td><td> <input type="text" name="show_ftpuser_items_each_page" value="{{ configuration.SITE_INTERFACE.show_ftpuser_items_each_page  }}"></td></tr>
+      <tr><td>{% trans "show_ftpgroup_items_each_page" %}: </td><td><input type="text" name="show_ftpgroup_items_each_page" value="{{ configuration.SITE_INTERFACE.show_ftpgroup_items_each_page  }}"></td></tr>
+      <tr><td>{% trans "show_ftplimit_items_each_page" %}:</td><td> <input type="text" name="show_ftplimit_items_each_page" value="{{ configuration.SITE_INTERFACE.show_ftplimit_items_each_page  }}"></td></tr>
+      <tr><td>{% trans "show_ftpquota_items_each_page" %}: </td><td><input type="text" name="show_ftpquota_items_each_page" value="{{ configuration.SITE_INTERFACE.show_ftpquota_items_each_page  }}"></td></tr>
+      <tr><td>{% trans "show_ftpxferstat_items_each_page" %}: </td><td><input type="text" name="show_ftpxferstat_items_each_page" value="{{ configuration.SITE_INTERFACE.show_ftpxferstat_items_each_page  }}"></td></tr>
+      <tr><td>{% trans "show_ftpacl_items_each_page" %}: </td><td><input type="text" name="show_ftpacl_items_each_page" value="{{ configuration.SITE_INTERFACE.show_ftpacl_items_each_page  }}"></td></tr>
+      <tr><td>{% trans "show_toplist_items_each_section" %}: </td><td><input type="text" name="show_toplist_items_each_section" value="{{ configuration.SITE_INTERFACE.show_toplist_items_each_section  }}"></td></tr>
+      <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+      <tr><td><input type="submit" value={% trans "Submit" %}></td><td>&nbsp;</td></tr>
+    </table>
+    </form>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}        
+{% load i18n %}
+{% block title %}| {% trans "ProFTPD Server Status" %} {% endblock %}
+{% block header %} {% trans "ProFTPD Server Status" %} {% endblock %}
+{% block content %}
+<p>&nbsp;</p>
+<p> Server&nbsp; type:&nbsp;<i>{{ info.server_type }}</i>  &nbsp;&nbsp;&nbsp;&nbsp;Master&nbsp; proftpd&nbsp; process: &nbsp;<i>{{ info.server_pid }}</i></p>
+<p> Up &nbsp; for &nbsp;&nbsp;&nbsp;-<i>{{ info.up_day }}</i>&nbsp;day,&nbsp;&nbsp;-<i>{{ info.up_hour }}</i>&nbsp; hrs &nbsp;&nbsp;-<i>{{ info.up_min }}</i>&nbsp;min </p>
+<p> Online&nbsp; users：&nbsp;<i>{{ info.user_count }}</i> </p>
+
+<table cellpadding="0" cellspacing="0" rules="all"  class="list_item">
+<tr class="titleRow">
+    <td>pid</td>
+    <td>username</td>
+    <td>time1</td>
+    <td>time2</td>
+    <td>cmd</td> 
+    <td>client_ip</td>
+    <td>server_ip</td>
+    <td>server_name</td>
+    <td>protocol</td>
+    <td>location</td>
+</tr>
+{% for line in info.status %}
+
+<tr class="defaultRow" onmouseover=" this.className = 'overRow';" onmouseout="this.className = 'defaultRow'">
+    <td>{{ line.pid }}</td>
+    <td>{{ line.username }}</td>
+    <td>{{ line.time1 }}</td>
+    <td>{{ line.time2 }}</td>
+    <td>{{ line.cmd }}</td>
+    <td>{{ line.client_ip }}</td>
+    <td>{{ line.server_ip }}</td>
+    <td>{{ line.server_name }}</td>
+    <td>{{ line.protocol }}</td>
+    <td>{{ line.location }}</td>
+
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

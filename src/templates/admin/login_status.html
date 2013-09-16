@@ -1,0 +1,11 @@
+{% extends "admin/group_base.html" %}
+{% block title %}| Login {% endblock %}
+{% block header %} Login {% endblock %}
+{% block content %}
+
+{% if action == 'login_success'  %}
+  {{ logintime }} ----  {{ username }}, You are Login Successfully!  
+<p></p>
+   Lastlogin time : {{ lastlogin }}
+{% endif %}
+{% endblock %}

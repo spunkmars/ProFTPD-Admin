@@ -1,0 +1,68 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+    <head>
+        <!--[if lt IE 9]><script language="javascript" type="text/javascript" src="/app_media/js/excanvas.js"></script><![endif]-->
+        <script language="javascript" type="text/javascript" src="/app_media/js/jqplot/jquery.min.js"></script>
+        <script language="javascript" type="text/javascript" src="/app_media/js/jqplot/jquery.jqplot.min.js"></script>
+        <script type="text/javascript" src="/app_media/js/jqplot/plugins/jqplot.barRenderer.min.js"></script>
+        <script type="text/javascript" src="/app_media/js/jqplot/plugins/jqplot.categoryAxisRenderer.min.js"></script>
+        <script type="text/javascript" src="/app_media/js/jqplot/plugins/jqplot.pointLabels.min.js"></script>
+        <link rel="stylesheet" type="text/css" href="/app_media/css/jqplot/jquery.jqplot.css" />
+        <script type="text/javascript"> 
+$(document).ready(function(){
+
+  var s1 = [50, 70, 700, 8000];
+  var s2 = [50, 30, 300, 2000];
+  plot1 = $.jqplot('chart3', [s1, s2],{
+    // Tell the plot to stack the bars.
+    stackSeries: true,
+    captureRightClick: true,
+    seriesDefaults:{
+      renderer:$.jqplot.BarRenderer,
+      rendererOptions: {
+          // Put a 30 pixel margin between bars.
+          barMargin: 30,
+          // Highlight bars when mouse button pressed.
+          // Disables default highlighting on mouse over.
+          highlightMouseDown: true   
+      },
+      pointLabels: {show: true}
+    },
+    axes: {
+      xaxis: {
+          renderer: $.jqplot.CategoryAxisRenderer
+      },
+      yaxis: {
+        // Don't pad out the bottom of the data range.  By default,
+        // axes scaled as if data extended 10% above and below the
+        // actual range to prevent data points right on grid boundaries.
+        // Don't want to do that here.
+        padMin: 0
+      }
+    },
+    legend: {
+      show: true,
+      location: 'e',
+      placement: 'outside'
+    }     
+  });
+  // Bind a listener to the "jqplotDataClick" event.  Here, simply change
+  // the text of the info3 element to show what series and ponit were
+  // clicked along with the data for that point.
+  $('#chart3').bind('jqplotDataClick',
+    function (ev, seriesIndex, pointIndex, data) {
+      $('#info3').html('series: '+seriesIndex+', point: '+pointIndex+', data: '+data);
+    }
+  );
+});
+        </script>
+        <title>test for jqplot </title>
+    </head>
+    <body>
+
+
+        <div id="chart3" style="height:400px;width:600px; "></div> 
+
+    </body>
+</html>

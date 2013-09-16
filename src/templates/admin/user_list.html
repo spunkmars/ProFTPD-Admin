@@ -1,0 +1,45 @@
+{% extends "admin/user_base.html" %}
+{% block title %}| User List{% endblock %}
+{% block header %} User List {% endblock %}
+{% block content %}
+
+        <table>
+            <tr>
+                <td><a href="/admin/user/add_user/">Add new User </a></td>
+            </tr>
+            <tr>
+                <td>ID</td>
+                <td>UserName</td>
+                <td>passwd</td>
+                <td>Group</td>
+                <td>Count</td>
+                <td>LastLogin</td>
+                <td>LastLogout</td>
+                <td>Expiration</td>
+                <td>Disabled</td>
+                <td>Det_name</td>
+                <td>Det_mail</td>
+                <td>Det_address</td>
+                <td>Det_notes</td>
+            </tr>
+        {% for user in user_list %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ user.passwd }}</td>
+                <td>{{ user.group }}</td>
+                <td>{{ user.count }}</td>
+                <td>{{ user.lastlogin }}</td>
+                <td>{{ user.lastlogout }}</td>
+                <td>{{ user.expiration }}</td>
+                <td>{{ user.disabled }}</td>
+                <td>{{ user.det_name }}</td>
+                <td>{{ user.det_mail }}</td>
+                <td>{{ user.det_address }}</td>
+                <td>{{ user.det_notes }}</td>
+                <td><a href="/admin/user/edit_user/{{ user.id }}/">Edit</a></td>
+                <td><a href="/admin/user/del_user/{{ user.id }}/">Del</a></td>
+            </tr>
+        {% endfor %}
+
+{% endblock %}

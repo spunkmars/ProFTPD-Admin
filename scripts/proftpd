@@ -1,0 +1,110 @@
+#!/bin/bash
+#
+# Apache         This shell script takes care of starting and stopping
+#               proftpd (ProFTPD daemon).
+#
+# chkconfig: 36 72 14
+# description: proftpd is the ProFTPD daemon. 
+# processname: proftpd
+
+export LANG="en_US.UTF-8"
+proftpd_base=/opt/proftpd
+proftpd_prog=${proftpd_base}/sbin/proftpd
+config_file=${proftpd_base}/etc/proftpd.conf
+proftpd_option="-c ${config_file}"
+pid_file=${proftpd_base}/var/proftpd.pid
+lock_file=/var/run/proftpd/proftpd.lock
+
+RETVAL=0
+
+
+
+success() {
+	
+	echo "Start ProFTPD successful.."
+
+
+}
+
+failure() {
+
+	echo "Start ProFTPD failure.."
+
+}
+
+
+
+ start() {
+
+	if [[ -e $lock_file  ]]; then
+		echo " ProFTPD is Running .."
+		exit 0
+	else
+		$proftpd_prog  ${proftpd_option} &
+	fi
+
+	 RETVAL=$?
+	[ $RETVAL -eq 0 ] && mkdir -p /var/run/proftpd && touch $lock_file
+        [ $RETVAL -eq 0 ] && success || failure
+	return $RETVAL
+}
+
+
+ stop() {
+
+
+	if [ -e $pid_file ]; then
+		proftpd_pid=`cat $pid_file`
+		kill -n 9  $proftpd_pid
+		RETVAL=$?
+		rm -rf $pid_file
+		
+	else
+		echo "ProFTPD is not running .."
+		#stop_all
+		RETVAL=0
+	fi
+	
+	[ $RETVAL -eq 0 ] && rm -f $lock_file
+	[ $RETVAL -eq 0 ] && echo "Stop ProFTPD .." || echo "Stop Apache fail .. "
+	return $RETVAL
+}
+
+
+
+ status() {
+	ps -ef|grep proftpd|grep -v "grep"|grep -v "status"
+}
+
+
+ testconfig() {
+        $proftpd_prog -c $config_file  -t
+
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  status)
+        status 
+        RETVAL=$?
+        ;;
+  testconfig)
+        testconfig
+        ;;
+  restart|reload|reconfigure)
+        stop
+        sleep 5
+        start
+        RETVAL=$?
+        ;;
+  *)
+        echo $"Usage: $0 {start|stop|reload|reconfigure|restart|status|testconfig}"
+        RETVAL=3
+esac
+
+exit $RETVAL

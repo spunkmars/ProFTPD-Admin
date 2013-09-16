@@ -1,0 +1,106 @@
+{% extends "ftpadmin/status_base.html" %}
+{% load i18n %}
+
+        {% block main_css %}
+        <link rel="stylesheet" type="text/css" href="/app_media/css/ftpadmin.css" />
+        <link rel="stylesheet" type="text/css" href="/media/css/forms.css" />
+        {% endblock %}
+
+        {% block main_js %}
+        <script type="text/javascript">window.__admin_media_prefix__ = "/media/";</script>
+        <script type="text/javascript" src="/admin/jsi18n/"></script>
+        <script type="text/javascript" src="/media/js/core.js"></script>
+        <script type="text/javascript" src="/media/js/calendar.js"></script>
+        <script type="text/javascript" src="/media/js/admin/DateTimeShortcuts.js"></script>
+        {% endblock %}
+
+{% block title %}| {% trans "Del Transfer Log" %} {% endblock %}
+{% block header %}    {% endblock %}
+
+{% block content %}
+
+<br /> <br />
+<h2 align="center"> {% trans "Del Transfer Log" %}  </h2>
+<table>
+    <tr><td height="40">&nbsp;</td></tr>
+    <tr> 
+        <td style="text-align:right" width="980"> 
+            <form action="" method="post">
+                {% trans "username" %}: &nbsp;<input id="id_username" type="text" name="username" value="" maxlength="30" />
+                &nbsp;&nbsp;{% trans "date" %}: &nbsp;<input id="id_date_0" class="vDateField" type="text" name="date_0" value="" maxlength="30" />
+                &nbsp;&nbsp;{% trans "time" %}: &nbsp;<input id="id_date_1" class="vTimeField" type="text" name="date_1" value="" maxlength="30" />
+
+<select name="expiration_month" id="id_expiration_month">
+        <option value="0">---</option>
+        <option value="1">一月</option>
+        <option value="2">二月</option>
+        <option value="3">三月</option>
+        <option value="4">四月</option>
+        <option value="5">五月</option>
+        <option value="6">六月</option>
+        <option value="7">七月</option>
+        <option value="8">八月</option>
+        <option value="9">九月</option>
+        <option value="10">十月</option>
+        <option value="11">十一月</option>
+        <option value="12">十二月</option>
+</select>
+<select name="expiration_day" id="id_expiration_day">
+    <option value="0">---</option>
+    <option value="1">1</option>
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+    <option value="5">5</option>
+    <option value="6">6</option>
+    <option value="7">7</option>
+    <option value="8">8</option>
+    <option value="9">9</option>
+    <option value="10">10</option>
+    <option value="11">11</option>
+    <option value="12">12</option>
+    <option value="13">13</option>
+    <option value="14">14</option>
+    <option value="15">15</option>
+    <option value="16">16</option>
+    <option value="17">17</option>
+    <option value="18">18</option>
+    <option value="19">19</option>
+    <option value="20">20</option>
+    <option value="21">21</option>
+    <option value="22">22</option>
+    <option value="23">23</option>
+    <option value="24">24</option>
+    <option value="25">25</option>
+    <option value="26">26</option>
+    <option value="27">27</option>
+    <option value="28">28</option>
+    <option value="29">29</option>
+    <option value="30">30</option>
+    <option value="31">31</option>
+</select>
+<select name="expiration_year" id="id_expiration_year">
+    <option value="0">---</option>
+    <option value="2010">2010</option>
+    <option value="2011">2011</option>
+    <option value="2012">2012</option>
+    <option value="2013">2013</option>
+    <option value="2014">2014</option>
+    <option value="2015">2015</option>
+    <option value="2016">2016</option>
+    <option value="2017">2017</option>
+    <option value="2018">2018</option>
+    <option value="2019">2019</option>
+    <option value="2020">2020</option>
+    <option value="2021">2021</option>
+    <option value="2022">2022</option>
+</select>
+
+
+                <input type="submit" value="Delete">
+            </form>
+        </td>
+     </tr>
+ </table>
+
+{% endblock %}

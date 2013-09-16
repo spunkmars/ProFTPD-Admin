@@ -1,0 +1,116 @@
+{% extends "ftpadmin/user_base.html" %}
+{% load i18n %}
+{% block title %}| {% trans "User Detail" %}{% endblock %}
+{% block header %} {% trans "User Detail" %} {% endblock %}
+{% block content %}
+
+<table width="800" height="34" border="0" align="center" cellpadding="0" cellspacing="0" b>
+  <tr>
+    <td >&nbsp;&nbsp;</td>
+  </tr>
+</table>
+<table width="805" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
+  <tr>
+    <td>
+
+<table width="800" height="32" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
+  <tr>
+    <td height="30" bordercolor="#ECE9D8">&nbsp;&nbsp;>> <em><strong>{{ ftpuser.username }}</strong></em></td>
+  </tr>
+</table>
+
+<table width="800" height="80" border="0" align="center" cellpadding="0" cellspacing="0" bordercolor="#66CCFF">
+  <tr>
+    <td width="16%" height="39">&nbsp;&nbsp;&nbsp;&nbsp;username:</td>
+    <td width="24%">{{ ftpuser.username }}</td>
+    <td colspan="2" rowspan="2">&nbsp;&nbsp;</td>
+    <td width="16%">group:</td>
+    <td width="34%">{{ ftpuser.group }}</td>
+  </tr>
+  <tr>
+    <td height="39">&nbsp;&nbsp;&nbsp;&nbsp;uid:</td>
+    <td>{{ ftpuser.uid }}</td>
+    <td>homedir:</td>
+    <td>{{ ftpuser.homedir }}</td>
+  </tr>
+</table>
+<table width="800" height="80" border="0" align="center" cellpadding="0" cellspacing="0" bordercolor="#DDF4FF">
+  <tr>
+    <td width="16%" height="39">&nbsp;&nbsp;&nbsp;&nbsp;count:</td>
+    <td width="24%">{{ ftpuser.count }}</td>
+    <td colspan="2" rowspan="2">&nbsp;&nbsp;</td>
+    <td width="16%">expiration:</td>
+    <td width="34%">{{ ftpuser.expiration }}</td>
+  </tr>
+  <tr>
+    <td height="39">&nbsp;&nbsp;&nbsp;&nbsp;lastlogin:</td>
+    <td>{{ ftpuser.lastlogin }}</td>
+    <td>lastlogout:</td>
+    <td>{{ ftpuser.lastlogout }}</td>
+  </tr>
+</table>
+<table width="800" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
+  <tr>
+    <td height="21" align="center">User Info</td>
+  </tr>
+</table>
+<table width="800" height="80" border="0" align="center" cellpadding="0" cellspacing="0" bordercolor="#66CCFF">
+  <tr>
+    <td width="16%" height="39">&nbsp;&nbsp;&nbsp;&nbsp;det_name:</td>
+    <td width="24%">{{ ftpuser.det_name  }}</td>
+    <td colspan="2" rowspan="2">&nbsp;&nbsp;</td>
+    <td width="16%">det_mail:</td>
+    <td width="34%">{{ ftpuser.det_mail  }}</td>
+  </tr>
+  <tr>
+    <td height="39">&nbsp;&nbsp;&nbsp;&nbsp;det_address:</td>
+    <td>{{ ftpuser.det_address  }}</td>
+    <td>det_notes:</td>
+    <td>{{ ftpuser.det_notes  }}</td>
+  </tr>
+</table>
+<table width="800" border="0" align="center" cellpadding="0" cellspacing="0">
+  <tr>
+    <td height="35">&nbsp;&nbsp;</td>
+  </tr>
+</table>
+
+<table width="800" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
+  <tr>
+    <td height="21" align="center">Quota Usage</td>
+  </tr>
+</table>
+<table width="800" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
+  <tr>
+    <td height="147">&nbsp;&nbsp;</td>
+  </tr>
+</table>
+    </td>
+  </tr>
+</table>
+<table width="800" border="0" align="center" cellpadding="0" cellspacing="0">
+  <tr>
+    <td height="19">&nbsp;&nbsp;</td>
+  </tr>
+</table>
+<table width="800" height="36" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
+  <tr>
+    <td width="500">&nbsp;&nbsp;</td>
+    <td width="100">Traffic</td>
+    <td width="100">Section</td>
+    <td width="100">Transfer Log</td>
+  </tr>
+</table>
+<table width="800" height="57" border="0" align="center" cellpadding="0" cellspacing="0">
+  <tr>
+    <td height="35">&nbsp;&nbsp;</td>
+  </tr>
+</table>
+<table width="800" height="201" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
+  <tr>
+    <td height="186">&nbsp;&nbsp;</td>
+  </tr>
+</table>
+
+
+{% endblock %}

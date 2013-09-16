@@ -1,0 +1,3805 @@
+diff -rduN proftpd-1.3.4b/contrib/mod_auth_cdb.c proftpd-1.3.4b_bak/contrib/mod_auth_cdb.c
+--- proftpd-1.3.4b/contrib/mod_auth_cdb.c	1970-01-01 08:00:00.000000000 +0800
++++ proftpd-1.3.4b_bak/contrib/mod_auth_cdb.c	2012-09-19 16:11:44.000000000 +0800
+@@ -0,0 +1,1069 @@
++/*
++ * ProFTPD: mod_auth_cdb -- CDB authentication module, using Dan J. Bernstein's
++ *                          CDB (Constant DataBase) format
++ *
++ * Copyright (c) 2001-2010 TJ Saunders
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307, USA.
++ *
++ * As a special exemption, TJ Saunders gives permission to link this program
++ * with OpenSSL, and distribute the resulting executable, without including
++ * the source code for OpenSSL in the source distribution.
++ *
++ * This is mod_auth_cdb, contrib software for proftpd 1.2.x and above.
++ * For more information contact TJ Saunders <tj@castaglia.org>.
++ *
++ * -- DO NOT MODIFY THE LINES BELOW --
++ *
++ * $Id: mod_auth_cdb.c,v 1.15 2010/11/18 18:56:50 tj Exp tj $
++ */
++
++#define MOD_AUTH_CDB_VERSION "mod_auth_cdb/0.9.1"
++
++#include "conf.h"
++
++/* Make sure the version of proftpd is as necessary. */
++#if PROFTPD_VERSION_NUMBER < 0x0001030205
++# error "ProFTPD 1.3.2 or later required"
++#endif
++
++#include <sys/mman.h>
++#include <sys/types.h>
++
++#if defined(HAVE_CRYPT_H) && !defined(AIX4) && !defined(AIX5)
++# include <crypt.h>
++#endif
++
++module auth_cdb_module;
++
++/* cdb defines.  Note that much of the CDB code is from Dan J. Bernstein's
++ * code -- the credit for authorship goes to him.
++ */
++
++#define CDB_HASHSTART 5381
++
++struct cdb {
++  char *map;
++  int fd;
++  time_t mtime;
++  unsigned long size;
++  unsigned long loop;
++  unsigned long khash;
++  unsigned long kpos;
++  unsigned long hpos;
++  unsigned long hslots;
++  unsigned long dpos;
++  unsigned long dlen;
++};
++
++#define cdb_datapos(c) ((c)->dpos)
++#define cdb_datalen(c) ((c)->dlen)
++
++typedef enum {
++  PR_CDB_GROUP,
++  PR_CDB_PASSWD
++} pr_cdb_type_t;
++
++/* necessary cdb routine prototypes */
++static void cdb_copy_data(register char *, register unsigned int,
++  register char *);
++static int cdb_diff_data(register char *, register unsigned int,
++  register char *);
++static unsigned cdb_free(struct cdb *);
++static int cdb_has_key(struct cdb *, char *, unsigned int);
++static unsigned long cdb_hash(char *, unsigned int);
++static unsigned cdb_init(struct cdb *, int, pr_cdb_type_t);
++static int cdb_match_key(struct cdb *, char *, unsigned int, unsigned long);
++static int cdb_read(struct cdb *, char *, unsigned int, unsigned long);
++static void cdb_rewind(struct cdb *);
++
++/* module variables */
++
++/* NOTE: use mlock() to protect static cache structures in future */
++
++static char *authcdbgroupfile = NULL;
++static struct cdb group_cdb;
++static struct group group_cache;
++static pool *group_pool = NULL;
++
++static char *authcdbuserfile = NULL;
++static struct cdb passwd_cdb;
++static struct passwd passwd_cache;
++static pool *passwd_pool = NULL;
++
++static void cdb_clear_group_cache(void);
++static void cdb_clear_passwd_cache(void);
++
++#define PR_CDB_BUFFER_SIZE 80
++
++/* CDB routines, so that this module does not require an external CDB library.
++ * Incorporating the cdb code this way is the approach recommended in the
++ * cdb sources themselves.
++ */
++static void cdb_copy_data(register char *to, register unsigned int len,
++    register char *from) {
++
++  for (;;) {
++    if (!len)
++      return;
++    *to++ = *from++;
++    --len;
++
++    if (!len)
++      return;
++    *to++ = *from++;
++    --len;
++
++    if (!len)
++      return;
++    *to++ = *from++;
++    --len;
++
++    if (!len)
++      return;
++    *to++ = *from++;
++    --len;
++  }
++}
++
++static int cdb_diff_data(register char *s, register unsigned int len,
++    register char *t) {
++
++  for (;;) {
++    if (!len)
++      return 0;
++
++    if (*s != *t)
++      break;
++    ++s; ++t; --len;
++
++    if (!len)
++      return 0;
++ 
++    if (*s != *t)
++      break;
++    ++s; ++t; --len;
++
++    if (!len)
++      return 0;
++
++    if (*s != *t)
++      break;
++    ++s; ++t; --len;
++
++    if (!len)
++      return 0;
++
++    if (*s != *t)
++      break;
++    ++s; ++t; --len;
++  }
++
++  return ((int)(unsigned int)(unsigned char) *s)
++       - ((int)(unsigned int)(unsigned char) *t);
++}
++
++static void cdb_unpack_data(char str[4], unsigned long *val) {
++  unsigned long res;
++
++  res = (unsigned char) str[3];
++  res <<= 8;
++  res += (unsigned char) str[2];
++  res <<= 8;
++  res += (unsigned char) str[1];
++  res <<= 8;
++  res += (unsigned char) str[0];
++
++  *val = res;
++}
++
++static unsigned long cdb_hash(char *buf, unsigned int buflen) {
++  unsigned long hash = CDB_HASHSTART;
++
++  while (buflen) {
++    hash += (hash << 5);
++    hash = (hash ^ *buf++);
++    --buflen;
++  }
++
++  return hash;
++}
++
++static int cdb_match_key(struct cdb *cdb, char *key, unsigned int len,
++    unsigned long pos) {
++  char buf[32] = {'\0'};
++  unsigned int buflen;
++
++  while (len > 0) {
++    buflen = sizeof(buf);
++    if (buflen > len)
++      buflen = len;
++
++    if (cdb_read(cdb, buf, buflen, pos) == -1)
++      return -1;
++
++    if (cdb_diff_data(buf, buflen, key))
++      return 0;
++
++    pos += buflen;
++    key += buflen;
++    len -= buflen;
++  }
++
++  return 1;
++}
++
++static void cdb_rewind(struct cdb *cdb) {
++  cdb->loop = 0;
++}
++
++static unsigned int cdb_free(struct cdb *cdb) {
++  if (cdb->map) {
++    if (munmap(cdb->map, cdb->size) < 0)
++      return FALSE;
++
++    cdb->map = 0;
++  }
++  close(cdb->fd);
++  cdb->fd = -1;
++
++  return TRUE;
++}
++
++static unsigned int cdb_init(struct cdb *cdb, int fd, pr_cdb_type_t cdb_type) {
++  struct stat sbuf;
++  char *map = NULL;
++
++  cdb_free(cdb);
++  cdb_rewind(cdb);
++  cdb->fd = fd;
++
++  if (fstat(fd, &sbuf) == 0) {
++    if (sbuf.st_size <= 0xffffffff) {
++      if ((map = mmap(0, sbuf.st_size, PROT_READ, MAP_SHARED, fd, 0)) ==
++          MAP_FAILED) {
++        return FALSE;
++      }
++
++      if (map + 1) {
++        cdb->size = sbuf.st_size;
++        cdb->map = map;
++      }
++
++      /* make sure that if the modification time has changed for this
++       * cdb, the cache for the appropiate information is cleared
++       */
++      if (sbuf.st_mtime > cdb->mtime) {
++        if (cdb_type == PR_CDB_GROUP)
++          cdb_clear_group_cache();
++        if (cdb_type == PR_CDB_PASSWD)
++          cdb_clear_passwd_cache();
++
++        cdb->mtime = sbuf.st_mtime;
++      }
++    }
++  }
++
++  return TRUE;
++}
++
++static int cdb_read(struct cdb *cdb, char *buf, unsigned int buflen,
++    unsigned long pos) {
++
++  if (cdb->map) {
++    if ((pos > cdb->size) || (cdb->size - pos < buflen)) {
++      errno = EINTR;
++      return -1;
++    }
++
++    cdb_copy_data(buf, buflen, cdb->map + pos);
++
++  } else {
++
++    if (lseek(cdb->fd, (off_t) pos, SEEK_SET) == -1)
++      return -1;
++
++    while (buflen > 0) {
++      int res;
++
++      /* read data */
++      do {
++        res = read(cdb->fd, buf, buflen);
++      } while ((res == -1) && (errno == EINTR));
++
++      if (res == -1)
++        return -1;
++
++      if (res == 0) {
++        errno = EPROTO;
++        return -1;
++      }
++
++      buf += res;
++      buflen -= res;
++    }
++  }
++
++  /* done */
++  return 0;
++}
++
++static int cdb_has_key(struct cdb *cdb, char *key, unsigned int len) {
++  char buf[8];
++  unsigned long pos;
++  unsigned long h;
++
++  cdb_rewind(cdb);
++
++  if (!cdb->loop) {
++    h = cdb_hash(key, len);
++
++    if (cdb_read(cdb, buf, 8, (h << 3) & 2047) == -1)
++      return -1;
++    cdb_unpack_data(buf + 4, &cdb->hslots);
++
++    if (!cdb->hslots)
++      return 0;
++    cdb_unpack_data(buf, &cdb->hpos);
++
++    cdb->khash = h;
++    h >>= 8;
++    h %= cdb->hslots;
++    h <<= 3;
++    cdb->kpos = cdb->hpos + h;
++  }
++
++  while (cdb->loop < cdb->hslots) {
++    if (cdb_read(cdb, buf, 8, cdb->kpos) == -1)
++      return -1;
++    cdb_unpack_data(buf + 4, &pos);
++
++    if (!pos)
++      return 0;
++
++    cdb->loop += 1;
++    cdb->kpos += 8;
++
++    if (cdb->kpos == cdb->hpos + (cdb->hslots << 3))
++      cdb->kpos = cdb->hpos;
++    cdb_unpack_data(buf, &h);
++
++    if (h == cdb->khash) {
++      if (cdb_read(cdb, buf, 8, pos) == -1)
++        return -1;
++      cdb_unpack_data(buf, &h);
++
++      if (h == len) {
++        switch(cdb_match_key(cdb, key, len, pos + 8)) {
++          case -1:
++            return -1;
++
++          case 1:
++            cdb_unpack_data(buf + 4, &cdb->dlen);
++            cdb->dpos = pos + 8 + len;
++            return 1;
++        }
++      }
++    }
++  }
++
++  return 0;
++}
++
++/* Utility routines
++ */
++
++static array_header *cdb_get_tokens(pool *p, char *string, const char delim) {
++  array_header *tokens = NULL;
++  char *copystring = NULL, *substring = NULL;
++
++  copystring = pstrdup(p, string);
++  tokens = make_array(p, 0, sizeof(char *));
++
++  /* break the given string up according to the delimiter, copying each
++   * token into the array_header
++   */
++  substring = strchr(copystring, (int) delim);
++  while (substring != NULL) {
++    copystring[substring - copystring] = '\0';
++    *((char **) push_array(tokens)) = pstrdup(p, copystring);
++
++    copystring = ++substring;
++    substring = strchr(copystring, (int) delim);
++  }
++
++  /* add the remaining substring to the tokens array, if any remain
++   */
++  if (*copystring != '\0')
++    *((char **) push_array(tokens)) = pstrdup(p, copystring);
++
++  return tokens;
++}
++
++static unsigned int cdb_close_group(void) {
++  if (!cdb_free(&group_cdb))
++    return FALSE;
++
++  return TRUE;
++}
++
++static unsigned int cdb_open_group(void) {
++  int cdb_fd = -1;
++
++  if (group_cdb.fd != -1)
++    return TRUE;
++
++  authcdbgroupfile = get_param_ptr(main_server->conf, "AuthCDBGroupFile",
++    FALSE);
++  if (authcdbgroupfile == NULL)
++    return FALSE;
++
++  /* open the cdb file */
++  cdb_fd = open(authcdbgroupfile, O_RDONLY);
++  if (cdb_fd < 0) {
++    pr_log_pri(PR_LOG_ERR, MOD_AUTH_CDB_VERSION ": unable to open '%s': %s",
++      authcdbgroupfile, strerror(errno));
++    return FALSE;
++  }
++
++  /* initialize the cdb struct */
++  if (!cdb_init(&group_cdb, cdb_fd, PR_CDB_GROUP)) {
++    pr_log_pri(PR_LOG_WARNING, MOD_AUTH_CDB_VERSION
++      ": unable to initialize cdb struct: %s", strerror(errno));
++    return FALSE; 
++  }
++
++  return TRUE;
++}
++
++static unsigned int cdb_close_passwd(void) {
++  if (!cdb_free(&passwd_cdb))
++    return FALSE;
++
++  return TRUE;
++}
++
++static unsigned int cdb_open_passwd(void) {
++  int cdb_fd = -1;
++
++  if (passwd_cdb.fd != -1)
++    return TRUE;
++
++  authcdbuserfile = get_param_ptr(main_server->conf, "AuthCDBUserFile", FALSE);
++  if (authcdbuserfile == NULL)
++    return FALSE;
++
++  /* open the cdb file */
++  cdb_fd = open(authcdbuserfile, O_RDONLY);
++  if (cdb_fd < 0) {
++    pr_log_pri(PR_LOG_ERR, MOD_AUTH_CDB_VERSION ": unable to open '%s': %s",
++      authcdbuserfile, strerror(errno));
++    return FALSE;
++  }
++
++  /* initialize the cdb struct */
++  if (!cdb_init(&passwd_cdb, cdb_fd, PR_CDB_PASSWD)) {
++    pr_log_pri(PR_LOG_WARNING, MOD_AUTH_CDB_VERSION
++      ": unable to initialize cdb struct: %s", strerror(errno));
++    return FALSE;
++  }
++
++  return TRUE;
++}
++
++static int cdb_parse_group_value(char *value) {
++  array_header *group_arr = NULL;
++  char **group_tokens = NULL;
++
++  /* clear the group cache */
++  memset((void *) &group_cache, 0, sizeof(struct group));
++
++  /* clear the group pool, and allocate a new one */
++  destroy_pool(group_pool);
++  group_pool = make_named_sub_pool(permanent_pool, "auth_cdb group pool");
++
++  /* tokenize the given value, using the specified delimited */
++  group_arr = cdb_get_tokens(group_pool, value, ':');
++
++  /* sanity check: 3 is the minimum number of fields in a properly formatted
++   * group(5) entry
++   */
++  if (group_arr->nelts < 3)
++    return -1;
++
++  group_tokens = (char **) group_arr->elts;
++
++  /* copy the tokenized fields into group cache */
++  group_cache.gr_name = group_tokens[0];
++  group_cache.gr_passwd = group_tokens[1];
++  group_cache.gr_gid = atol(group_tokens[2]);
++
++  /* tokenize the fourth element, if present, using a different delimiter,
++   * as it will be the comma-delimited list of users in this group.
++   */
++  if (group_arr->nelts >= 4) {
++    register int index = 0;
++    array_header *member_arr = cdb_get_tokens(group_pool, group_tokens[3], ',');
++    char **member_tokens = (char **) member_arr->elts;
++
++    group_cache.gr_mem = (char **) palloc(group_pool,
++      member_arr->nelts * sizeof(char *));
++
++    for (index = 0; index < member_arr->nelts; index++)
++      group_cache.gr_mem[index] = member_tokens[index];
++
++  } else {
++    group_cache.gr_mem = NULL;
++  }
++
++  return 0;
++}
++
++static struct group *cdb_get_group(char *key) {
++  char *group_entry = NULL;
++
++  /* sanity check */
++  if (group_cdb.fd == -1)
++    return NULL;
++
++  /* check to see if the requested group is in the cdb */
++  if (cdb_has_key(&group_cdb, key, strlen(key)) <= 0) {
++    char *groupstr = NULL;
++    gid_t gid = -1;
++
++    gid = (gid_t) strtol(key, &groupstr, 10);
++
++    if (groupstr &&
++        *groupstr != '\0') {
++      pr_log_pri(PR_LOG_NOTICE, MOD_AUTH_CDB_VERSION
++        ": no such group '%s' in '%s'", key, authcdbgroupfile);
++
++    } else {
++      pr_log_pri(PR_LOG_NOTICE, MOD_AUTH_CDB_VERSION
++        ": no such GID '%lu' in '%s'", (unsigned long) gid, authcdbgroupfile);
++    }
++
++    return NULL;
++  }
++
++  /* read in the group data, parse it into the group cache, and return a
++   * pointer to the cache
++   */
++  group_entry = (char *) pcalloc(group_pool, cdb_datalen(&group_cdb));
++
++  if (cdb_read(&group_cdb, group_entry, cdb_datalen(&group_cdb),
++      cdb_datapos(&group_cdb)) < 0) {
++    pr_log_pri(PR_LOG_ERR, MOD_AUTH_CDB_VERSION ": error reading from '%s': %s",
++      authcdbgroupfile, strerror(errno));
++    return NULL;
++  }
++
++  if (cdb_parse_group_value(group_entry) < 0) {
++    pr_log_pri(PR_LOG_ERR, MOD_AUTH_CDB_VERSION
++      ": error parsing '%s' group entry in '%s': %s", key, authcdbgroupfile,
++      strerror(EINVAL));
++    return NULL;
++  }
++
++  return &group_cache;
++}
++
++static int cdb_parse_passwd_value(char *value) {
++  array_header *passwd_arr = NULL;
++  char **passwd_tokens = NULL;
++
++  /* clear the passwd cache */
++  memset((void *) &passwd_cache, 0, sizeof(struct passwd));
++
++  /* clear the passwd pool, and reallocate a new one */
++  destroy_pool(passwd_pool);
++  passwd_pool = make_named_sub_pool(permanent_pool, "auth_cdb passwd pool");
++
++  /* tokenize the given value, using the specified delimiter */
++  passwd_arr = cdb_get_tokens(passwd_pool, value, ':');
++
++  /* sanity check: 7 is the number of fields in a properly formatted
++   * passwd(5) entry
++   */
++  if (passwd_arr->nelts < 7)
++    return -1;
++
++  passwd_tokens = (char **) passwd_arr->elts;
++
++  /* copy the tokenized fields into the passwd cache */
++
++  passwd_cache.pw_name = passwd_tokens[0];
++  passwd_cache.pw_passwd = passwd_tokens[1];
++  passwd_cache.pw_uid = atol(passwd_tokens[2]);
++  passwd_cache.pw_gid = atol(passwd_tokens[3]);
++  passwd_cache.pw_gecos = passwd_tokens[4];
++  passwd_cache.pw_dir = passwd_tokens[5];
++  passwd_cache.pw_shell = passwd_tokens[6];
++
++  return 0; 
++}
++
++static struct passwd *cdb_get_passwd(char *key) {
++  char *passwd_entry = NULL;
++  int res;
++
++  /* sanity check */
++  if (passwd_cdb.fd == -1)
++    return NULL;
++
++  /* check to see if the requested passwd is in the cdb */
++  res = cdb_has_key(&passwd_cdb, key, strlen(key));
++  if (res == 0) {
++    char *userstr = NULL;
++    uid_t uid = -1;
++
++    uid = (uid_t) strtol(key, &userstr, 10);
++
++    if (userstr &&
++        *userstr != '\0') {
++      pr_log_pri(PR_LOG_NOTICE, MOD_AUTH_CDB_VERSION
++        ": no such user '%s' in '%s'", key, authcdbuserfile);
++
++    } else {
++      pr_log_pri(PR_LOG_NOTICE, MOD_AUTH_CDB_VERSION
++        ": no such UID '%lu' in '%s'", (unsigned long) uid, authcdbuserfile);
++    }
++
++    return NULL;
++
++  } else if (res == -1) {
++    pr_log_pri(PR_LOG_ERR, MOD_AUTH_CDB_VERSION ": error reading '%s': %s",
++      authcdbuserfile, strerror(errno));
++    return NULL;
++  }
++
++  /* read in the passwd data, parse it into the passwd cache, and return a
++   * pointer to the cache
++   */
++  passwd_entry = (char *) pcalloc(passwd_pool, cdb_datalen(&passwd_cdb));
++
++  if (cdb_read(&passwd_cdb, passwd_entry, cdb_datalen(&passwd_cdb),
++      cdb_datapos(&passwd_cdb)) < 0) {
++    pr_log_pri(PR_LOG_ERR, MOD_AUTH_CDB_VERSION ": error reading from '%s': %s",
++      authcdbuserfile, strerror(errno));
++    return NULL;
++  }
++
++  if (cdb_parse_passwd_value(passwd_entry) < 0) {
++    pr_log_pri(PR_LOG_ERR, MOD_AUTH_CDB_VERSION
++      ": error parsing '%s' passwd entry from '%s': %s", key, authcdbuserfile,
++      strerror(EINVAL));
++    return NULL;
++  }
++
++  return &passwd_cache;
++}
++
++static void cdb_clear_group_cache(void) {
++  group_cache.gr_name = NULL;
++  group_cache.gr_passwd = NULL;
++  group_cache.gr_gid = (gid_t) -1;
++  group_cache.gr_mem = NULL;
++}
++
++static void cdb_clear_passwd_cache(void) {
++  passwd_cache.pw_name = NULL;
++  passwd_cache.pw_passwd = NULL;
++  passwd_cache.pw_uid = (uid_t) -1;
++  passwd_cache.pw_gid = (gid_t) -1;
++  passwd_cache.pw_gecos = NULL;
++  passwd_cache.pw_dir = NULL;
++  passwd_cache.pw_shell = NULL;
++}
++
++/* Event handlers
++ */
++
++static void auth_cdb_restart_ev(const void *event_data, void *user_data) {
++  cdb_clear_passwd_cache();
++  cdb_clear_group_cache();
++}
++
++/* initialize the module by registering the rehash function, allocating
++ * pools.
++ */
++static int auth_cdb_init(void) {
++  passwd_pool = make_sub_pool(permanent_pool);
++  group_pool = make_sub_pool(permanent_pool);
++
++  cdb_clear_passwd_cache();
++  cdb_clear_group_cache();
++
++  pr_event_register(&auth_cdb_module, "core.restart", auth_cdb_restart_ev,
++    NULL);
++
++  /* make sure the cdb structures are marked as "uninitialized" */
++  group_cdb.fd = -1;
++  group_cdb.mtime = (time_t) 0;
++  passwd_cdb.fd = -1;
++  passwd_cdb.mtime = (time_t) 0;
++
++  return 0;
++}
++
++/* Authentication handlers
++ */
++
++/* cmd->argv[0]: user name
++ * cmd->argv[1]: cleartext password
++ */
++
++MODRET cdb_auth(cmd_rec *cmd) {
++  time_t now;
++
++  /* unless mod_auth's order of calling authtab functions changes, I'm
++   * going to assume that the cached passwd information is not stale, and
++   * save myself the trouble of some function calls here
++   */
++  char *cryptpw = passwd_cache.pw_passwd;
++
++  /* NOTE: these variables will be largely unused until this module
++   *  provides quasi-shadowing support
++   */
++  time_t lstchg = -1, max = -1, inact = -1, disable = -1;
++
++  /* make sure we have a passwd to work with
++   */
++  if (!cryptpw)
++    return PR_DECLINED(cmd);
++
++  time(&now);
++
++  if (!cryptpw)
++    return PR_ERROR_INT(cmd, PR_AUTH_NOPWD);
++
++  if (pr_auth_check(cmd->tmp_pool, cryptpw, cmd->argv[0], cmd->argv[1])) {
++    return PR_ERROR_INT(cmd, PR_AUTH_BADPWD);
++  }
++
++  if (lstchg > (time_t) 0 &&
++      max > (time_t) 0 &&
++      inact > (time_t) 0)
++    if (now > lstchg + max + inact)
++      return PR_ERROR_INT(cmd, PR_AUTH_AGEPWD);
++
++  if (disable > (time_t) 0 &&
++      now > disable)
++    return PR_ERROR_INT(cmd, PR_AUTH_DISABLEDPWD);
++
++  return PR_HANDLED(cmd);
++}
++
++/* cmd->argv[0] = hashed password
++ * cmd->argv[1] = user name
++ * cmd->argv[2] = cleartext password
++ */
++MODRET cdb_check(cmd_rec *cmd) {
++  char *cryptpw = cmd->argv[0];
++  char *clearpw = cmd->argv[2];
++
++  if (strcmp(crypt(clearpw, cryptpw), cryptpw) != 0) {
++    pr_log_debug(DEBUG0, MOD_AUTH_CDB_VERSION
++      ": unable to check password, declining");
++    return PR_DECLINED(cmd);
++  }
++
++  return PR_HANDLED(cmd);
++}
++
++MODRET cdb_name2uid(cmd_rec *cmd) {
++
++  /* if the requested user's information is already in the cached struct
++   * passwd, return that.  Only if the requested user is different should a
++   * lookup be done.
++   */
++  if (passwd_cache.pw_name &&
++      !strcmp(passwd_cache.pw_name, cmd->argv[0]))
++    return mod_create_data(cmd, (void *) passwd_cache.pw_uid);
++
++  if (cdb_get_passwd(cmd->argv[0]) != NULL)
++    return mod_create_data(cmd, (void *) passwd_cache.pw_uid);
++
++  return PR_DECLINED(cmd);
++}
++
++MODRET cdb_name2gid(cmd_rec *cmd) {
++
++  /* if the requested group's information is already in the cached struct
++   * group, return that.  Only if the requested group is different should a
++   * lookup be done.
++   */
++  if (group_cache.gr_name &&
++      !strcmp(group_cache.gr_name, cmd->argv[0]))
++    return mod_create_data(cmd, (void *) group_cache.gr_gid);
++
++  if (cdb_get_group(cmd->argv[0]) != NULL)
++    return mod_create_data(cmd, (void *) group_cache.gr_gid);
++
++  return PR_DECLINED(cmd);
++}
++
++MODRET cdb_uid2name(cmd_rec *cmd) {
++  char buf[PR_CDB_BUFFER_SIZE] = {'\0'};
++
++  /* if the requested user's information is already in the cached struct
++   * passwd, return that.  Only if the requested user is different should a
++   * lookup be done.
++   */
++  if (passwd_cache.pw_uid &&
++      passwd_cache.pw_uid == (uid_t) cmd->argv[0])
++    return mod_create_data(cmd, (void *) passwd_cache.pw_name);
++
++  /* convert the given numeric into a string */
++  snprintf(buf, sizeof(buf), "%lu", (unsigned long) cmd->argv[0]);
++  if (cdb_get_passwd(buf) != NULL)
++    return mod_create_data(cmd, (void *) passwd_cache.pw_name);
++
++  return PR_DECLINED(cmd);
++}
++
++MODRET cdb_gid2name(cmd_rec *cmd) {
++  char buf[PR_CDB_BUFFER_SIZE] = {'\0'};
++
++  /* if the requested group's information is already in the cached struct
++   * group, return that.  Only if the requested group is different should a
++   * lookup be done.
++   */
++  if (group_cache.gr_gid &&
++      group_cache.gr_gid == (gid_t) cmd->argv[0])
++    return mod_create_data(cmd, (void *) group_cache.gr_name);
++
++  /* convert the given numeric into a string */
++  snprintf(buf, sizeof(buf), "%lu", (unsigned long) cmd->argv[0]);
++  if (cdb_get_group(buf) != NULL)
++    return mod_create_data(cmd, (void *) group_cache.gr_name);
++
++  return PR_DECLINED(cmd);
++}
++
++MODRET cdb_endgrent(cmd_rec *cmd) {
++  cdb_close_group();
++  return PR_DECLINED(cmd);
++}
++
++MODRET cdb_getgrnam(cmd_rec *cmd) {
++  if (!cdb_open_group())
++    return PR_DECLINED(cmd);
++
++  /* if the requested group's information is already in the group cache,
++   * return that.  Only if the requested group is different should a lookup
++   * be done.
++   */
++  if (group_cache.gr_name &&
++      !strcmp(group_cache.gr_name, cmd->argv[0]))
++    return mod_create_data(cmd, (void *) &group_cache);
++
++  if (cdb_get_group(cmd->argv[0]) != NULL)
++    return mod_create_data(cmd, (void *) &group_cache);
++
++  return PR_DECLINED(cmd);
++}
++
++MODRET cdb_getgrent(cmd_rec *cmd) {
++  if (!cdb_open_group())
++    return PR_DECLINED(cmd);
++
++  /* NOTE: this function may not be necessary, as the CDB format means that
++   * lookups don't need to scroll through every record.  However, it should
++   * probably be implemented at some point anyway, should some module
++   * require the ability to iterate through group/passwd structs.
++   */
++  return PR_HANDLED(cmd);
++}
++
++MODRET cdb_getgrgid(cmd_rec *cmd) {
++  char buf[PR_CDB_BUFFER_SIZE] = {'\0'};
++
++  if (!cdb_open_group())
++    return PR_DECLINED(cmd);
++  
++  /* if the requested group's information is already in the group cache,
++   * return that.  Only if the requested group is different should a lookup
++   * be done.
++   */
++  if (group_cache.gr_gid != (gid_t) -1 &&
++      group_cache.gr_gid == (gid_t) cmd->argv[0])
++    return mod_create_data(cmd, (void *) &group_cache);
++  
++  /* convert the given numeric into a string */
++  snprintf(buf, sizeof(buf), "%lu", (unsigned long) cmd->argv[0]);
++  if (cdb_get_group(buf) != NULL)
++    return mod_create_data(cmd, (void *) &group_cache);
++
++  return PR_DECLINED(cmd);
++}
++
++MODRET cdb_setgrent(cmd_rec *cmd) {
++  cdb_rewind(&group_cdb);
++  return PR_DECLINED(cmd);
++}
++
++MODRET cdb_endpwent(cmd_rec *cmd) {
++  cdb_close_passwd();
++  return PR_DECLINED(cmd);
++}
++
++MODRET cdb_getpwnam(cmd_rec *cmd) {
++
++  if (!cdb_open_passwd())
++    return PR_DECLINED(cmd);
++
++  /* if the requested user's information is already in the passwd cache,
++   * return that.  Only if the requested user is different should a lookup
++   * be done
++   */
++  if (passwd_cache.pw_name &&
++      !strcmp(passwd_cache.pw_name, cmd->argv[0]))
++    return mod_create_data(cmd, (void *) &passwd_cache);
++
++  if (cdb_get_passwd(cmd->argv[0]) != NULL)
++    return mod_create_data(cmd, (void *) &passwd_cache);
++
++  return PR_DECLINED(cmd);
++}
++
++MODRET cdb_getpwent(cmd_rec *cmd) {
++  if (!cdb_open_passwd())
++    return PR_DECLINED(cmd);
++
++  /* rewind to the start of the passwd cdb, and start scrolling through
++   * the records
++   */
++
++  /* NOTE: this function may not be necessary, as the CDB format means that
++   * lookups don't need to scroll through every record.  However, it should
++   * probably be implemented at some point anyway, should some module
++   * require the ability to iterate through group/passwd structs.
++   */
++
++  return PR_HANDLED(cmd);
++}
++
++MODRET cdb_getpwuid(cmd_rec *cmd) {
++  char buf[PR_TUNABLE_BUFFER_SIZE] = {'\0'};
++
++  if (!cdb_open_passwd())
++    return PR_DECLINED(cmd);
++  
++  /* if the requested user's information is already in the passwd cache,
++   * return that.  Only if the requested user is different should a lookup
++   * be done.
++   */
++  if (passwd_cache.pw_uid != (uid_t) -1 &&
++      passwd_cache.pw_uid == (uid_t) cmd->argv[0])
++    return mod_create_data(cmd, (void *) &passwd_cache);
++ 
++  /* convert the given numeric into a string */
++  snprintf(buf, sizeof(buf), "%lu", (unsigned long) cmd->argv[0]);
++  if (cdb_get_passwd(buf) != NULL)
++    return mod_create_data(cmd, (void *) &passwd_cache);
++ 
++  return PR_DECLINED(cmd);
++}
++
++MODRET cdb_setpwent(cmd_rec *cmd) {
++  cdb_rewind(&passwd_cdb);
++  return PR_DECLINED(cmd);
++}
++
++/* Configuration directive handlers
++ */
++
++MODRET set_authcdbgroupfile(cmd_rec *cmd) {
++  CHECK_ARGS(cmd, 1);
++  CHECK_CONF(cmd, CONF_ROOT|CONF_VIRTUAL|CONF_GLOBAL);
++
++  /* insure that an absolute path has been given */
++  if (*(cmd->argv[1]) != '/')
++    CONF_ERROR(cmd, "requires an absolute path");
++
++  add_config_param_str("AuthCDBGroupFile", 1, (void *) cmd->argv[1]);
++  return PR_HANDLED(cmd);
++}
++
++MODRET set_authcdbuserfile(cmd_rec *cmd) {
++  CHECK_ARGS(cmd, 1);
++  CHECK_CONF(cmd, CONF_ROOT|CONF_VIRTUAL|CONF_GLOBAL);
++
++  /* insure that an absolute path has been given */
++  if (*(cmd->argv[1]) != '/')
++    CONF_ERROR(cmd, "requires an absolute path");
++
++  add_config_param_str("AuthCDBUserFile", 1, (void *) cmd->argv[1]);
++  return PR_HANDLED(cmd);
++}
++
++/* ProFTPD Module API tables
++ */
++
++static conftable auth_cdb_conftab[] = {
++  { "AuthCDBGroupFile", set_authcdbgroupfile, NULL },
++  { "AuthCDBUserFile", set_authcdbuserfile, NULL },
++  { NULL }
++};
++
++static authtable auth_cdb_authtab[] = {
++  { 0, "setpwent",  cdb_setpwent },
++  { 0, "setgrent",  cdb_setgrent },
++  { 0, "endpwent",  cdb_endpwent },
++  { 0, "endgrent",  cdb_endgrent },
++  { 0, "getpwent",  cdb_getpwent },
++  { 0, "getgrent",  cdb_getgrent },
++  { 0, "getpwnam",  cdb_getpwnam },
++  { 0, "getgrnam",  cdb_getgrnam },
++  { 0, "getpwuid",  cdb_getpwuid },
++  { 0, "getgrgid",  cdb_getgrgid },
++  { 0, "auth",      cdb_auth     },
++  { 0, "check",     cdb_check    },
++  { 0, "uid_name",  cdb_uid2name },
++  { 0, "gid_name",  cdb_gid2name },
++  { 0, "name_uid",  cdb_name2uid },
++  { 0, "name_gid",  cdb_name2gid },
++  { 0, NULL }
++};
++
++module auth_cdb_module = {
++  NULL,
++  NULL,
++
++  /* Module API version 2.0 */
++  0x20,
++
++  /* Module name */
++  "auth_cdb",
++
++  /* Module configuration handler table */
++  auth_cdb_conftab,
++
++  /* Module command handler table */
++  NULL,
++
++  /* Module authentication handler table */
++  auth_cdb_authtab,
++
++  /* Module initialization function */
++  auth_cdb_init,
++
++  /* Module session initialization function */
++  NULL,
++
++  /* Module version */
++  MOD_AUTH_CDB_VERSION
++};
+diff -rduN proftpd-1.3.4b/contrib/mod_autohost.c proftpd-1.3.4b_bak/contrib/mod_autohost.c
+--- proftpd-1.3.4b/contrib/mod_autohost.c	1970-01-01 08:00:00.000000000 +0800
++++ proftpd-1.3.4b_bak/contrib/mod_autohost.c	2012-09-19 16:11:44.000000000 +0800
+@@ -0,0 +1,497 @@
++/*
++ * ProFTPD: mod_autohost -- a module for mass virtual hosting
++ *
++ * Copyright (c) 2004-2011 TJ Saunders
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307, USA.
++ *
++ * As a special exemption, TJ Saunders and other respective copyright holders
++ * give permission to link this program with OpenSSL, and distribute the
++ * resulting executable, without including the source code for OpenSSL in the
++ * source distribution.
++ *
++ * This is mod_autohost, contrib software for proftpd 1.3.x and above.
++ * For more information contact TJ Saunders <tj@castaglia.org>.
++ *
++ * $Id: mod_autohost.c,v 1.4 2011/03/01 21:29:09 tj Exp tj $
++ */
++
++#include "conf.h"
++#include "privs.h"
++
++#define MOD_AUTOHOST_VERSION		"mod_autohost/0.4"
++
++#if PROFTPD_VERSION_NUMBER < 0x0001030401
++# error "ProFTPD 1.3.4rc1 or later required"
++#endif
++
++module autohost_module;
++
++static const char *autohost_config = NULL;
++static unsigned int autohost_engine = FALSE;
++static int autohost_logfd = -1;
++static pool *autohost_pool = NULL;
++static xaset_t *autohost_server_list = NULL;
++
++/* XXX Note: this function makes crass assumptions about IPv4 connections;
++ * we are soon going to need to properly support IPv6 addresses/connections.
++ */
++static char *autohost_get_config(conn_t *conn) {
++  char *ipstr, *portstr, *path = (char *) autohost_config;
++  char *oct1str, *oct2str, *oct3str, *oct4str;
++  char *start, *end;
++
++  ipstr = (char *) pr_netaddr_get_ipstr(conn->local_addr);
++
++  start = ipstr;
++  end = strchr(start, '.');
++  *end = '\0';
++  oct1str = pstrdup(autohost_pool, start);
++
++  start = end + 1;
++  *end = '.';
++  end = strchr(start, '.');
++  *end = '\0';
++  oct2str = pstrdup(autohost_pool, start);
++
++  start = end + 1;
++  *end = '.';
++  end = strchr(start, '.');
++  *end = '\0';
++  oct3str = pstrdup(autohost_pool, start);
++
++  start = end + 1;
++  *end = '.';
++  oct4str = pstrdup(autohost_pool, start);
++
++  portstr = pcalloc(autohost_pool, 10);
++  snprintf(portstr, 10, "%u", conn->local_port);
++
++  if (strstr(path, "%0") != NULL) {
++    path = sreplace(autohost_pool, path, "%0", ipstr, NULL);
++  }
++
++  if (strstr(path, "%1") != NULL) {
++    path = sreplace(autohost_pool, path, "%1", oct1str, NULL);
++  }
++
++  if (strstr(path, "%2") != NULL) {
++    path = sreplace(autohost_pool, path, "%2", oct2str, NULL);
++  }
++
++  if (strstr(path, "%3") != NULL) {
++    path = sreplace(autohost_pool, path, "%3", oct3str, NULL);
++  }
++
++  if (strstr(path, "%4") != NULL) {
++    path = sreplace(autohost_pool, path, "%4", oct4str, NULL);
++  }
++
++  if (strstr(path, "%p") != NULL) {
++    path = sreplace(autohost_pool, path, "%p", portstr, NULL);
++  }
++
++  return path;
++}
++
++static int autohost_parse_config(conn_t *conn, char *path) {
++  server_rec *s;
++  pr_ipbind_t *binding;
++
++  /* We use session.pool here, rather than autohost_pool, because
++   * we'll be destroying autohost_pool once the server_rec has
++   * been created and bound.
++   */
++  pr_parser_prepare(session.pool, &autohost_server_list);
++
++  pr_parser_server_ctxt_open(pr_netaddr_get_ipstr(conn->local_addr));
++
++  /* XXX: some things, like Port, <VirtualHost>, etc in the autohost.conf
++   * file will be ignored.
++   */
++
++  if (pr_parser_parse_file(session.pool, path, NULL, 0) < 0) {
++    return -1;
++  }
++
++  pr_parser_server_ctxt_close();
++
++  pr_parser_cleanup();
++
++  if (fixup_servers(autohost_server_list) < 0) {
++    (void) pr_log_writefile(autohost_logfd, MOD_AUTOHOST_VERSION,
++      "error fixing up autohost: %s", strerror(errno));
++    return -1;
++  }
++
++  s = (server_rec *) autohost_server_list->xas_list;
++  s->ServerPort = conn->local_port;
++
++  /* Now that we have a valid server_rec, we need to bind it to
++   * the address to which the client connected.
++   */
++
++  binding = pr_ipbind_find(conn->local_addr, conn->local_port, TRUE);
++  if (binding == NULL) {
++    if (pr_ipbind_create(s, conn->local_addr, conn->local_port) < 0) {
++      (void) pr_log_writefile(autohost_logfd, MOD_AUTOHOST_VERSION,
++        "error creating binding: %s", strerror(errno));
++      return -1;
++    }
++
++    if (pr_ipbind_open(conn->local_addr, conn->local_port, main_server->listen,
++        TRUE, TRUE, FALSE) < 0) {
++      (void) pr_log_writefile(autohost_logfd, MOD_AUTOHOST_VERSION,
++        "error opening binding for %s#%d: %s",
++        pr_netaddr_get_ipstr(conn->local_addr), conn->local_port,
++          strerror(errno));
++      return -1;
++    }
++
++  } else {
++
++    /* If we already have a binding in place, we need to replace the
++     * server_rec to which that binding points with our new server_rec.
++     */
++    binding->ib_server = s;
++  }
++
++  return 0;
++}
++
++/* Configuration handlers
++ */
++
++/* usage: AutoHostConfig path */
++MODRET set_autohostconfig(cmd_rec *cmd) {
++  CHECK_ARGS(cmd, 1);
++  CHECK_CONF(cmd, CONF_ROOT);
++
++  if (pr_fs_valid_path(cmd->argv[1]) < 0) {
++    CONF_ERROR(cmd, pstrcat(cmd->tmp_pool, "'", cmd->argv[1],
++      "' is not a valid path", NULL));
++  }
++
++  (void) add_config_param_str(cmd->argv[0], 1, cmd->argv[1]);
++  return PR_HANDLED(cmd);
++}
++
++/* usage: AutoHostEngine on|off */
++MODRET set_autohostengine(cmd_rec *cmd) {
++  int bool;
++  config_rec *c;
++
++  CHECK_ARGS(cmd, 1);
++  CHECK_CONF(cmd, CONF_ROOT);
++
++  bool = get_boolean(cmd, 1);
++  if (bool == -1)
++    CONF_ERROR(cmd, "expected Boolean parameter");
++
++  c = add_config_param(cmd->argv[0], 1, NULL);
++  c->argv[0] = pcalloc(c->pool, sizeof(unsigned int));
++  *((unsigned int *) c->argv[0]) = bool;
++
++  return PR_HANDLED(cmd);
++}
++
++/* usage: AutoHostLog path */
++MODRET set_autohostlog(cmd_rec *cmd) {
++  CHECK_ARGS(cmd, 1);
++  CHECK_CONF(cmd, CONF_ROOT);
++
++  if (pr_fs_valid_path(cmd->argv[1]) < 0) {
++    CONF_ERROR(cmd, pstrcat(cmd->tmp_pool, "'", cmd->argv[1],
++      "' is not a valid path", NULL));
++  }
++
++  (void) add_config_param_str(cmd->argv[0], 1, cmd->argv[1]);
++  return PR_HANDLED(cmd);
++}
++
++/* usage: AutoHostPorts port1 ... portN */
++MODRET set_autohostports(cmd_rec *cmd) {
++  register unsigned int i;
++  config_rec *c;
++  array_header *port_list;
++
++  if (cmd->argc < 2)
++    CONF_ERROR(cmd, "wrong number of parameters");
++  CHECK_CONF(cmd, CONF_ROOT);
++
++  /* First, scan all of the configured ports to make sure that they are
++   * all valid port numbers.
++   */
++  for (i = 1; i < cmd->argc; i++) {
++    int port;
++
++    port = atoi(cmd->argv[i]);
++    if (port < 1 ||
++        port > 65535) {
++      CONF_ERROR(cmd, "port must be between 1 and 65535");
++    }
++  }
++
++  c = add_config_param(cmd->argv[0], 1, NULL);
++
++  port_list = make_array(c->pool, cmd->argc - 1, sizeof(int));
++  for (i = 1; i < cmd->argc; i++) {
++    *((int *) push_array(port_list)) = atoi(cmd->argv[i]);
++  }
++
++  c->argv[0] = port_list;
++  return PR_HANDLED(cmd);
++}
++
++/* Event handlers
++ */
++
++static void autohost_connect_ev(const void *event_data, void *user_data) {
++  char *path;
++  struct stat st;
++  conn_t *conn = (conn_t *) event_data;
++ 
++  if (!autohost_engine)
++    return;
++
++#ifdef PR_USE_IPV6
++  /* NOTE: we currently do not handle IPv6 address. */
++  if (pr_netaddr_get_family(conn->local_addr) == AF_INET6) {
++    pr_log_debug(DEBUG0, MOD_AUTOHOST_VERSION
++      ": unable to handle IPv6 addresses");
++    return;
++  }
++#endif /* PR_USE_IPV6 */
++
++  /* Autohost config files, if found, will take precedence over a matching
++   * server config found in the main config file.
++   *
++   * To avoid this precedence, we could see if there is a binding already
++   * configured for the incoming connection, e.g.:
++   *
++   *  if (pr_ipbind_get_server(conn->local_addr, conn->local_port) != NULL)
++   *
++   * but this would preclude us from being able to create multiple bindings
++   * for the different AutoHostPorts.
++   */
++
++  /* Note that we need not necessarily worry about not destroying autohost_pool.
++   * It is allocated after the fork().
++   */
++
++  path = autohost_get_config(conn);  
++
++  if (pr_fsio_stat(path, &st) < 0) {
++    (void) pr_log_writefile(autohost_logfd, MOD_AUTOHOST_VERSION,
++      "error checking for '%s': %s", path, strerror(errno));
++    return;
++  }
++
++  if (autohost_parse_config(conn, path) < 0) {
++    (void) pr_log_writefile(autohost_logfd, MOD_AUTOHOST_VERSION,
++      "error parsing '%s': %s", path, strerror(errno));
++    return;
++  }
++
++  (void) pr_log_writefile(autohost_logfd, MOD_AUTOHOST_VERSION,
++    "found autohost for %s#%u", pr_netaddr_get_ipstr(conn->local_addr),
++    conn->local_port);
++
++  return;
++}
++
++#if defined(PR_SHARED_MODULE)
++static void autohost_mod_unload_ev(const void *event_data, void *user_data) {
++  if (strcmp("mod_autohost.c", (const char *) event_data) == 0) {
++    pr_event_unregister(&autohost_module, NULL, NULL);
++  }
++}
++#endif
++
++static void autohost_postparse_ev(const void *event_data, void *user_data) {
++  config_rec *c;
++
++  c = find_config(main_server->conf, CONF_PARAM, "AutoHostEngine", FALSE);
++  if (c) {
++    autohost_engine = *((unsigned int *) c->argv[0]);
++  }
++
++  if (!autohost_engine)
++    return;
++
++  autohost_pool = make_sub_pool(permanent_pool);
++  pr_pool_tag(autohost_pool, MOD_AUTOHOST_VERSION);
++
++  pr_event_register(&autohost_module, "core.connect", autohost_connect_ev,
++    NULL);
++
++  c = find_config(main_server->conf, CONF_PARAM, "AutoHostConfig", FALSE);
++  if (c) {
++    autohost_config = c->argv[0];
++
++  } else {
++    pr_log_debug(DEBUG0, MOD_AUTOHOST_VERSION
++      ": missing required AutoHostConfig");
++    end_login(1);
++  }
++
++  c = find_config(main_server->conf, CONF_PARAM, "AutoHostLog", FALSE);
++  if (c) {
++    int res;
++    char *autohost_log;
++
++    autohost_log = c->argv[0];
++
++    PRIVS_ROOT
++    res = pr_log_openfile(autohost_log, &autohost_logfd, 0660);
++    PRIVS_RELINQUISH
++
++    switch (res) {
++      case 0:
++        break;
++
++      case -1:
++        pr_log_debug(DEBUG1, MOD_AUTOHOST_VERSION
++          ": unable to open AutoHostLog '%s': %s", autohost_log,
++          strerror(errno));
++        break;
++
++      case PR_LOG_SYMLINK:
++        pr_log_debug(DEBUG1, MOD_AUTOHOST_VERSION
++          ": unable to open AutoHostLog '%s': %s", autohost_log,
++          "is a symlink");
++        break;
++
++      case PR_LOG_WRITABLE_DIR:
++        pr_log_debug(DEBUG0, MOD_AUTOHOST_VERSION
++          ": unable to open AutoHostLog '%s': %s", autohost_log,
++          "parent directory is world-writable");
++        break;
++    }
++  }
++
++  autohost_server_list = xaset_create(autohost_pool, NULL);
++
++  c = find_config(main_server->conf, CONF_PARAM, "AutoHostPorts", FALSE);
++  if (c) {
++    register unsigned int i;
++    array_header *port_list;
++    int *ports;
++
++    port_list = c->argv[0];
++    ports = port_list->elts;
++
++    /* We need to open a binding for each of the specific ports, unless
++     * such a binding already exists.
++     */
++
++    for (i = 0; i < port_list->nelts; i++) {
++      if (pr_ipbind_find(main_server->addr, ports[i], TRUE) == NULL) {
++        int res;
++        conn_t *listener;
++
++        (void) pr_log_writefile(autohost_logfd, MOD_AUTOHOST_VERSION,
++          "adding socket for AutoHostPort %d", ports[i]);
++
++        res = pr_ipbind_create(main_server, main_server->addr, ports[i]);
++        if (res < 0) {
++          (void) pr_log_writefile(autohost_logfd, MOD_AUTOHOST_VERSION,
++            "error creating binding for %s#%d: %s",
++            pr_netaddr_get_ipstr(main_server->addr), ports[i], strerror(errno));
++          continue;
++        }
++
++        /* Create a listening socket for this port. */
++        listener = pr_inet_create_conn(autohost_pool, -1, main_server->addr,
++          ports[i], FALSE);
++        if (listener == NULL) {
++          (void) pr_log_writefile(autohost_logfd, MOD_AUTOHOST_VERSION,
++            "error opening new listening socket for port %d: %s", ports[i],
++            strerror(errno));
++          continue;
++        }
++
++        res = pr_ipbind_open(main_server->addr, ports[i], listener, FALSE,
++          FALSE, TRUE);
++        if (res < 0) {
++          (void) pr_log_writefile(autohost_logfd, MOD_AUTOHOST_VERSION,
++            "error opening binding for %s:%d: %s",
++            pr_netaddr_get_ipstr(main_server->addr), ports[i], strerror(errno));
++          continue;
++        }
++
++        (void) pr_log_writefile(autohost_logfd, MOD_AUTOHOST_VERSION,
++          "opening listening socket for %s on AutoHostPort %d",
++          pr_netaddr_get_ipstr(main_server->addr), ports[i]);
++      }
++    }
++  }
++
++  return;
++}
++
++/* Initialization routines
++ */
++
++static int autohost_init(void) {
++#if defined(PR_SHARED_MODULE)
++  pr_event_register(&autohost_module, "core.module-unload",
++    autohost_mod_unload_ev, NULL);
++#endif /* PR_SHARED_MODULE */
++
++  pr_event_register(&autohost_module, "core.postparse", autohost_postparse_ev,
++    NULL);
++
++  return 0;
++}
++
++/* Module API tables
++ */
++
++static conftable autohost_conftab[] = {
++  { "AutoHostConfig",	set_autohostconfig,	NULL },
++  { "AutoHostEngine",	set_autohostengine,	NULL },
++  { "AutoHostLog",	set_autohostlog,	NULL },
++  { "AutoHostPorts",	set_autohostports,	NULL },
++  { NULL }
++};
++
++module autohost_module = {
++  NULL, NULL,
++
++  /* Module API version 2.0 */
++  0x20,
++
++  /* Module name */
++  "autohost",
++
++  /* Module configuration handler table */
++  autohost_conftab,
++
++  /* Module command handler table */
++  NULL,
++
++  /* Module authentication handler table */
++  NULL,
++
++  /* Module initialization function */
++  autohost_init,
++
++  /* Session initialization function */
++  NULL,
++
++  /* Module version */
++  MOD_AUTOHOST_VERSION
++};
+diff -rduN proftpd-1.3.4b/contrib/mod_conf_sql.c proftpd-1.3.4b_bak/contrib/mod_conf_sql.c
+--- proftpd-1.3.4b/contrib/mod_conf_sql.c	1970-01-01 08:00:00.000000000 +0800
++++ proftpd-1.3.4b_bak/contrib/mod_conf_sql.c	2012-09-19 16:11:44.000000000 +0800
+@@ -0,0 +1,1074 @@
++/*
++ * ProFTPD: mod_conf_sql -- a module for reading configurations from SQL tables
++ *
++ * Copyright (c) 2003-2006 TJ Saunders
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307, USA.
++ *
++ * As a special exemption, TJ Saunders and other respective copyright holders
++ * give permission to link this program with OpenSSL, and distribute the
++ * resulting executable, without including the source code for OpenSSL in the
++ * source distribution.
++ *
++ * This is mod_conf_sql, contrib software for proftpd 1.2 and above.
++ * For more information contact TJ Saunders <tj@castaglia.org>.
++ *
++ * $Id: mod_conf_sql.c,v 1.8 2006/02/05 20:06:34 tj Exp tj $
++ */
++
++#include "conf.h"
++#include "mod_sql.h"
++
++/* Make sure the version of proftpd is as necessary. */
++#if PROFTPD_VERSION_NUMBER < 0x0001030001
++# error "ProFTPD 1.3.0rc1 or later required"
++#endif
++
++#define MOD_CONF_SQL_VERSION	"mod_conf_sql/0.7.1"
++
++struct {
++  char *user;
++  char *pass;
++  char *server;
++  char *database;
++
++} sqlconf_db;
++
++struct {
++  char *tab;
++  char *id;
++
++  char *parent_id;
++  char *key;
++  char *value;
++
++  char *where;
++  char *base_id;
++} sqlconf_ctxts;
++
++struct {
++  char *tab;
++  char *id;
++  char *key;
++  char *value;
++
++  char *where;
++} sqlconf_confs;
++
++struct {
++  char *tab;
++  char *conf_id;
++  char *ctxt_id;
++
++  char *where;
++} sqlconf_maps;
++
++#define SQLCONF_DEFAULT_CONF_ID_NAME    "conf_id"
++#define SQLCONF_DEFAULT_CTXT_ID_NAME    "ctxt_id"
++#define SQLCONF_DEFAULT_ID_NAME         "id"
++#define SQLCONF_DEFAULT_KEY_NAME       	"key"
++#define SQLCONF_DEFAULT_PARENT_ID_NAME  "parent_id"
++#define SQLCONF_DEFAULT_VALUE_NAME      "value"
++
++static pool *sqlconf_pool = NULL;
++static array_header *sqlconf_conf = NULL;
++static unsigned int sqlconf_confi = 0;
++
++module conf_sql_module;
++
++/* Prototypes */
++static int sqlconf_read_ctxt(pool *, int, int);
++static void sqlconf_register(void);
++
++/* URI parsing routines
++ */
++
++static int sqlconf_parse_uri_db(char **uri) {
++  char *tmp = NULL;
++
++  tmp = strchr(*uri, ':');
++  if (tmp == NULL) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  *tmp = '\0';
++  sqlconf_db.user = pstrdup(sqlconf_pool, *uri);
++
++  /* Advance past the given db user. */
++  *uri = tmp + 1;
++
++  tmp = strchr(*uri, '@');
++  if (tmp == NULL) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  *tmp = '\0';
++  sqlconf_db.pass = pstrdup(sqlconf_pool, *uri); 
++
++  /* Advance past the given db passwd. */
++  *uri = tmp + 1;
++
++  tmp = strchr(*uri, '/');
++  if (tmp == NULL) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  *tmp = '\0';
++  sqlconf_db.server = pstrdup(sqlconf_pool, *uri);
++
++  /* Advance past the given server info. */
++  *uri = tmp + 1;
++
++  tmp = strchr(*uri, ':');
++  if (tmp == NULL) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  *tmp = '\0';
++  if (strcmp(*uri, "db") != 0) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  *uri = tmp + 1;
++
++  tmp = strchr(*uri, '/');
++  if (tmp == NULL) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  *tmp = '\0';
++  sqlconf_db.database = pstrdup(sqlconf_pool, *uri);
++
++  *uri = tmp + 1;
++  return 0;
++}
++
++static int sqlconf_parse_uri_ctxt(char **uri) {
++  char *tmp = NULL, *tmp2 = NULL;
++
++  if (strncmp(*uri, "ctxt:", 5) != 0) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  *uri += 5;
++
++  tmp = strchr(*uri, '/');
++  if (tmp == NULL) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  /* Defaults */
++  sqlconf_ctxts.id = SQLCONF_DEFAULT_ID_NAME;
++  sqlconf_ctxts.parent_id = SQLCONF_DEFAULT_PARENT_ID_NAME;
++  sqlconf_ctxts.key = SQLCONF_DEFAULT_KEY_NAME;
++  sqlconf_ctxts.value = SQLCONF_DEFAULT_VALUE_NAME;
++  sqlconf_ctxts.where = NULL;
++
++  *tmp = '\0';
++
++  tmp2 = strchr(*uri, ':');
++  if (tmp2 == NULL) {
++    sqlconf_ctxts.tab = pstrdup(sqlconf_pool, *uri);
++    *uri = tmp + 1;
++    return 0;
++  }
++
++  *tmp2 = '\0';
++  sqlconf_ctxts.tab = pstrdup(sqlconf_pool, *uri);
++
++  *uri = tmp2 + 1;
++
++  tmp2 = strchr(*uri, ',');
++  if (tmp2 == NULL) {
++
++    /* At this point, it's possible that the URI is specifying a WHERE clause,
++     * so that it looks like:
++     *
++     *  ctxt:where=foo
++     *
++     * So, check for a '=' character here.
++     */
++
++    tmp2 = strchr(*uri, '=');
++    if (tmp2 == NULL) {
++      errno = EINVAL;
++      return -1;
++
++    } else {
++
++      *tmp2 = '\0';
++
++      /* Make sure it's "where=". */
++      if (strcmp(*uri, "where") == 0) {
++        *uri = tmp2 + 1; 
++        sqlconf_ctxts.where = pstrdup(sqlconf_pool, *uri);
++
++        *uri = tmp + 1;
++        return 0;
++
++      } else {
++        errno = EINVAL;
++        return -1;
++      }
++    }
++  }
++
++  *tmp2 = '\0';
++  sqlconf_ctxts.id = pstrdup(sqlconf_pool, *uri);
++
++  *uri = tmp2 + 1;
++
++  tmp2 = strchr(*uri, ',');
++  if (tmp2 == NULL) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  *tmp2 = '\0';
++  sqlconf_ctxts.parent_id = pstrdup(sqlconf_pool, *uri);
++
++  *uri = tmp2 + 1;
++
++  tmp2 = strchr(*uri, ',');
++  if (tmp2 == NULL) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  *tmp2 = '\0';
++  sqlconf_ctxts.key = pstrdup(sqlconf_pool, *uri);
++
++  *uri = tmp2 + 1;
++
++  /* Check for the optional "where=foo" URI syntax construct here. */
++  tmp2 = strchr(*uri, ':');
++  if (tmp2 == NULL) {
++    sqlconf_ctxts.value = pstrdup(sqlconf_pool, *uri);
++
++  } else {
++    *tmp2 = '\0';
++    sqlconf_ctxts.value = pstrdup(sqlconf_pool, *uri);
++
++    *uri = tmp2 + 1;
++    if (strncmp(*uri, "where=", 6) == 0) {
++      *uri += 6;
++      sqlconf_ctxts.where = pstrdup(sqlconf_pool, *uri);
++
++    } else {
++      errno = EINVAL;
++      return -1;
++    }
++  }
++
++  *uri = tmp + 1;
++  return 0;
++}
++
++static int sqlconf_parse_uri_conf(char **uri) {
++  char *tmp = NULL, *tmp2 = NULL;
++
++  if (strncmp(*uri, "conf:", 5) != 0) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  *uri += 5;
++
++  tmp = strchr(*uri, '/');
++  if (tmp == NULL) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  /* Defaults */
++  sqlconf_confs.id = SQLCONF_DEFAULT_ID_NAME;
++  sqlconf_confs.key = SQLCONF_DEFAULT_KEY_NAME;
++  sqlconf_confs.value = SQLCONF_DEFAULT_VALUE_NAME;
++  sqlconf_confs.where = NULL;
++
++  *tmp = '\0';
++
++  tmp2 = strchr(*uri, ':');
++  if (tmp2 == NULL) {
++    sqlconf_confs.tab = pstrdup(sqlconf_pool, *uri);
++    *uri = tmp + 1;
++    return 0;
++  }
++
++  *tmp2 = '\0';
++  sqlconf_confs.tab = pstrdup(sqlconf_pool, *uri);
++
++  *uri = tmp2 + 1;
++
++  tmp2 = strchr(*uri, ',');
++  if (tmp2 == NULL) {
++
++    /* At this point, it's possible that the URI is specifying a WHERE clause,
++     * so that it looks like:
++     *
++     *  conf:where=foo
++     *
++     * So, check for a '=' character here.
++     */
++
++    tmp2 = strchr(*uri, '=');
++    if (tmp2 == NULL) {
++      errno = EINVAL;
++      return -1;
++
++    } else {
++
++      *tmp2 = '\0';
++
++      /* Make sure it's "where=". */
++      if (strcmp(*uri, "where") == 0) {
++        *uri = tmp2 + 1;
++        sqlconf_confs.where = pstrdup(sqlconf_pool, *uri);
++
++        *uri = tmp + 1;
++        return 0;
++
++      } else {
++        errno = EINVAL;
++        return -1;
++      }
++    }
++  }
++
++  *tmp2 = '\0';
++  sqlconf_confs.id = pstrdup(sqlconf_pool, *uri);
++
++  *uri = tmp2 + 1;
++
++  tmp2 = strchr(*uri, ',');
++  if (tmp2 == NULL) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  *tmp2 = '\0';
++  sqlconf_confs.key = pstrdup(sqlconf_pool, *uri);
++ 
++  *uri = tmp2 + 1;
++
++  /* Check for the optional "where=foo" URI syntax construct here. */
++  tmp2 = strchr(*uri, ':');
++  if (tmp2 == NULL) {
++    sqlconf_confs.value = pstrdup(sqlconf_pool, *uri);
++
++  } else {
++    *tmp2 = '\0';
++    sqlconf_confs.value = pstrdup(sqlconf_pool, *uri);
++
++    *uri = tmp2 + 1;
++    if (strncmp(*uri, "where=", 6) == 0) {
++      *uri += 6;
++      sqlconf_confs.where = pstrdup(sqlconf_pool, *uri);
++
++    } else {
++      errno = EINVAL;
++      return -1;
++    }
++  }
++
++  *uri = tmp + 1;
++  return 0;
++}
++
++static int sqlconf_parse_uri_map(char **uri) {
++  char *tmp = NULL, *tmp2 = NULL;
++
++  if (strncmp(*uri, "map:", 4) != 0) {
++    errno = EINVAL;
++    return -1;
++  }
++
++  *uri += 4;
++
++  tmp = strchr(*uri, '/');
++  if (tmp != NULL)
++    *tmp = '\0';
++
++  /* Defaults */
++  sqlconf_maps.conf_id = SQLCONF_DEFAULT_CONF_ID_NAME;
++  sqlconf_maps.ctxt_id = SQLCONF_DEFAULT_CTXT_ID_NAME;
++  sqlconf_maps.where = NULL;
++
++  tmp2 = strchr(*uri, ':');
++  if (tmp2 == NULL) {
++    sqlconf_maps.tab = pstrdup(sqlconf_pool, *uri);
++    *uri = tmp ? tmp + 1 : *uri + strlen(*uri);
++    return 0;
++  }
++
++  *tmp2 = '\0';
++  sqlconf_maps.tab = pstrdup(sqlconf_pool, *uri);
++
++  *uri = tmp2 + 1;
++
++  tmp2 = strchr(*uri, ',');
++  if (tmp2 == NULL) {
++
++    /* At this point, it's possible that the URI is specifying a WHERE clause,
++     * so that it looks like:
++     *
++     *  map:where=foo
++     *
++     * So, check for a '=' character here.
++     */
++
++    tmp2 = strchr(*uri, '=');
++    if (tmp2 == NULL) {
++      errno = EINVAL;
++      return -1;
++
++    } else {
++
++      *tmp2 = '\0';
++
++      /* Make sure it's "where=". */
++      if (strcmp(*uri, "where") == 0) {
++        *uri = tmp2 + 1;
++        sqlconf_maps.where = pstrdup(sqlconf_pool, *uri);
++
++        *uri = tmp + 1;
++        *uri += strlen(*uri);
++        return 0;
++
++      } else {
++        errno = EINVAL;
++        return -1;
++      }
++    }
++  }
++
++  *tmp2 = '\0';
++  sqlconf_maps.conf_id = pstrdup(sqlconf_pool, *uri);
++
++  *uri = tmp2 + 1;
++
++  /* Check for the optional "where=foo" URI syntax construct here. */
++  tmp2 = strchr(*uri, ':');
++  if (tmp2 == NULL) {
++    sqlconf_maps.ctxt_id = pstrdup(sqlconf_pool, *uri);
++
++  } else {
++    *tmp2 = '\0';
++    sqlconf_maps.ctxt_id = pstrdup(sqlconf_pool, *uri);
++
++    *uri = tmp2 + 1;
++    if (strncmp(*uri, "where=", 6) == 0) {
++      *uri += 6;
++      sqlconf_maps.where = pstrdup(sqlconf_pool, *uri);
++
++    } else {
++      errno = EINVAL;
++      return -1;
++    }
++  }
++
++  if (tmp)
++    *uri = tmp + 1;
++  else
++    *uri += strlen(*uri);
++
++  return 0;
++}
++
++/* Expected format of the URI:
++ *
++ * sql://dbuser:dbpass@dbserver[:dbport]/db:<name>\
++ *   /ctxt:<table>[:id,parent_id,key,value][:where=<clause>]\
++ *   /conf:<table>[:id,key,value][:where=<clause>]\
++ *   /map:<table>[:conf_id,ctxt_id][:where=<clause>]\
++ *   [/base_id=<name>]
++ */
++static int sqlconf_parse_uri(char *uri) {
++
++  /* First, skip past the prefix.  6 is the strlen of "sql://". */
++  uri += 6;
++
++  if (sqlconf_parse_uri_db(&uri) < 0) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": failed parsing connect portion of URI");
++    return -1;
++  }
++
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": db.user: '%s'",
++    sqlconf_db.user);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": db.server: '%s'",
++    sqlconf_db.server);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": db.database: '%s'",
++    sqlconf_db.database);
++
++  if (sqlconf_parse_uri_ctxt(&uri) < 0) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": failed parsing context table portion of URI");
++    return -1;
++  }
++
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": ctxt.tab: '%s'",
++    sqlconf_ctxts.tab);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": ctxt.id: '%s'",
++    sqlconf_ctxts.id);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": ctxt.parent_id: '%s'",
++    sqlconf_ctxts.parent_id);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": ctxt.key: '%s'",
++    sqlconf_ctxts.key);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": ctxt.value: '%s'",
++    sqlconf_ctxts.value);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": ctxt.where: '%s'",
++    sqlconf_ctxts.where ? sqlconf_ctxts.where : "(none)");
++
++  if (sqlconf_parse_uri_conf(&uri) < 0) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": failed parsing directive table portion of URI");
++    return -1;
++  }
++
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": conf.tab: '%s'",
++    sqlconf_confs.tab);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": conf.id: '%s'",
++    sqlconf_confs.id);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": conf.key: '%s'",
++    sqlconf_confs.key);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": conf.value: '%s'",
++    sqlconf_confs.value);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": conf.where: '%s'",
++    sqlconf_confs.where ? sqlconf_confs.where : "(none)");
++
++  if (sqlconf_parse_uri_map(&uri) < 0) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": failed parsing map table portion of URI");
++    return -1;
++  }
++
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": map.tab: '%s'",
++    sqlconf_maps.tab);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": map.conf_id: '%s'",
++    sqlconf_maps.conf_id);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": map.ctxt_id: '%s'",
++    sqlconf_maps.ctxt_id);
++  pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": map.where: '%s'",
++    sqlconf_maps.where ? sqlconf_maps.where : "(none)");
++
++  if (*uri) {
++
++    /* The only option allowed here is:
++     *
++     *  base_id=id
++     *
++     */
++    if (strncmp(uri, "base_id=", 8) != 0) {
++      pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++        ": failed parsing optional base ID portion of URI");
++      errno = EINVAL;
++      return -1;
++    }
++
++    uri += 8;
++    sqlconf_ctxts.base_id = pstrdup(sqlconf_pool, uri);
++    pr_log_debug(DEBUG6, MOD_CONF_SQL_VERSION ": ctxts.base_id: '%s'",
++      sqlconf_ctxts.base_id);
++  }
++
++  return 0;
++}
++
++/* SQL functions
++ */
++
++/* Note: mod_sql.c doesn't expose this function, so we'll need our own copy
++ * of it.
++ */
++static cmd_rec *sqlconf_cmd_alloc(pool *p, int argc, ...) {
++  pool *sub_pool = NULL;
++  cmd_rec *cmd = NULL;
++  va_list args;
++  register unsigned int i = 0;
++
++  sub_pool = make_sub_pool(p);
++  cmd = pcalloc(sub_pool, sizeof(cmd_rec));
++  cmd->argc = argc;
++  cmd->stash_index = -1;
++  cmd->pool = sub_pool;
++
++  cmd->argv = pcalloc(sub_pool, sizeof(void *) * (argc));
++  cmd->tmp_pool = sub_pool;
++
++  va_start(args, argc);
++
++  for (i = 0; i < argc; i++)
++    cmd->argv[i] = (void *) va_arg(args, char *);
++  va_end(args);
++
++  return cmd;
++}
++
++static modret_t *sqlconf_dispatch(cmd_rec *cmd, char *name) {
++  cmdtable *cmdtab;
++  modret_t *res;
++
++  cmdtab = pr_stash_get_symbol(PR_SYM_HOOK, name, NULL, NULL);
++  if (!cmdtab) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": unable to find SQL hook symbol '%s'", name);
++    return ERROR(cmd);
++  }
++
++  res = call_module(cmdtab->m, cmdtab->handler, cmd);
++
++  /* Do some sanity checks on the returned response. */
++  if (MODRET_ISERROR(res)) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION ": '%s' error: %s", name,
++      res->mr_message);
++    return NULL;
++  }
++
++  return res;
++}
++
++/* Database-reading routines
++ */
++
++static int sqlconf_read_ctxt_ctxts(pool *p, int ctxt_id) {
++  cmd_rec *cmd = NULL;
++  modret_t *res = NULL;
++  sql_data_t *sd = NULL;
++  char *where = NULL;
++
++  register unsigned int i = 0;
++  char idstr[64] = {'\0'};
++
++  snprintf(idstr, sizeof(idstr)-1, "%d", ctxt_id);
++  idstr[sizeof(idstr)-1] = '\0';
++
++  if (!sqlconf_ctxts.where) {
++    where = pstrcat(p, sqlconf_ctxts.parent_id, " = ", idstr, NULL);
++
++  } else {
++    where = pstrcat(p, sqlconf_ctxts.parent_id, " = ", idstr, " AND ",
++      sqlconf_ctxts.where, NULL);
++  }
++
++  cmd = sqlconf_cmd_alloc(p, 4, "sqlconf", sqlconf_ctxts.tab,
++    sqlconf_ctxts.id, where);
++
++  res = sqlconf_dispatch(cmd, "sql_select");
++  if (!res)
++    return -1;
++
++  sd = res->data;
++
++  for (i = 0; i < sd->rnum; i++) {
++    sqlconf_read_ctxt(p, atoi(sd->data[i]), FALSE);
++  }
++
++  return 0;
++}
++
++static int sqlconf_read_conf(pool *p, int ctxt_id) {
++  cmd_rec *cmd = NULL;
++  modret_t *res = NULL;
++  sql_data_t *sd = NULL;
++  char *query = NULL;
++
++  register unsigned int i = 0;
++  char idstr[64] = {'\0'};
++
++  snprintf(idstr, sizeof(idstr)-1, "%d", ctxt_id);
++  idstr[sizeof(idstr)-1] = '\0';
++
++  if (!sqlconf_confs.where) {
++    query = pstrcat(p, sqlconf_confs.key, ", ", sqlconf_confs.value,
++      " FROM ", sqlconf_confs.tab, " INNER JOIN ", sqlconf_maps.tab,
++      " ON ", sqlconf_confs.tab, ".", sqlconf_confs.id, " = ",
++      sqlconf_maps.tab, ".", sqlconf_maps.conf_id, " WHERE ",
++      sqlconf_maps.tab, ".", sqlconf_maps.ctxt_id, " = ", idstr, NULL);
++
++  } else {
++    query = pstrcat(p, sqlconf_confs.key, ", ", sqlconf_confs.value,
++      " FROM ", sqlconf_confs.tab, " INNER JOIN ", sqlconf_maps.tab,
++      " ON ", sqlconf_confs.tab, ".", sqlconf_confs.id, " = ",
++      sqlconf_maps.tab, ".", sqlconf_maps.conf_id, " WHERE ",
++      sqlconf_maps.tab, ".", sqlconf_maps.ctxt_id, " = ", idstr,
++      " AND ", sqlconf_confs.where, NULL);
++  }
++
++  cmd = sqlconf_cmd_alloc(p, 2, "sqlconf", query);
++
++  res = sqlconf_dispatch(cmd, "sql_select");
++  if (!res)
++    return -1;
++
++  sd = res->data;
++
++  for (i = 0; i < sd->rnum; i++) {
++    char *str = pstrcat(sqlconf_pool,
++      sd->data[(i * sd->fnum)], " ", sd->data[(i * sd->fnum) + 1], "\n", NULL);
++    *((char **) push_array(sqlconf_conf)) = str;
++  }
++
++  return 0;
++}
++
++static int sqlconf_read_ctxt(pool *p, int ctxt_id, int isbase) {
++  cmd_rec *cmd = NULL;
++  modret_t *res = NULL;
++  sql_data_t *sd = NULL;
++  char *where = NULL;
++
++  char idstr[64] = {'\0'};
++  char *ctxt_key = NULL, *ctxt_val = NULL;
++
++  snprintf(idstr, sizeof(idstr)-1, "%d", ctxt_id);
++  idstr[sizeof(idstr)-1] = '\0';
++
++  if (!sqlconf_ctxts.where) {
++    where = pstrcat(p, sqlconf_ctxts.id, " = ", idstr, NULL);
++
++  } else {
++    where = pstrcat(p, sqlconf_ctxts.id, " = ", idstr, " AND ",
++      sqlconf_ctxts.where, NULL);
++  }
++
++  cmd = sqlconf_cmd_alloc(p, 4, "sqlconf", sqlconf_ctxts.tab,
++    pstrcat(p, sqlconf_ctxts.key, ", ", sqlconf_ctxts.value, NULL),
++    where);
++
++  res = sqlconf_dispatch(cmd, "sql_select");
++  if (!res) {
++    pr_log_debug(DEBUG4, MOD_CONF_SQL_VERSION
++      ": notice: context ID (%d) has no associated key/value", ctxt_id);
++    return -1;
++  }
++
++  sd = res->data;
++
++  if (sd->rnum > 1) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": error: multiple key/values returned for given context ID (%d)",
++      ctxt_id);
++    return -1;
++  }
++
++  ctxt_key = sd->data[0];
++  ctxt_val = sd->data[1];
++
++  if (ctxt_key &&
++      !isbase) {
++    *((char **) push_array(sqlconf_conf)) = pstrcat(sqlconf_pool, "<",
++      ctxt_key, ctxt_val ? " " : "", ctxt_val ? ctxt_val : "", ">\n", NULL);
++  }
++
++  if (sqlconf_read_conf(p, ctxt_id) < 0)
++    return -1;
++
++  if (sqlconf_read_ctxt_ctxts(p, ctxt_id) < 0)
++    return -1;
++
++  if (ctxt_key &&
++      !isbase) {
++    *((char **) push_array(sqlconf_conf)) = pstrcat(sqlconf_pool, "</",
++      ctxt_key, ">\n", NULL);
++  }
++
++  return 0;
++}
++
++/* Construct the configuration file from the database contents. */
++static int sqlconf_read_db(pool *p) {
++  int id = 0;
++  cmd_rec *cmd = NULL;
++  modret_t *res = NULL;
++  sql_data_t *sd = NULL;
++  char *where = NULL;
++  char *which_id = NULL;
++
++  /* Load the SQL backend module we'll be using. */
++  cmd = sqlconf_cmd_alloc(p, 0);
++  res = sqlconf_dispatch(cmd, "sql_load_backend");
++  destroy_pool(cmd->pool);
++
++  /* Prepare the SQL subsystem. */
++  cmd = sqlconf_cmd_alloc(p, 1, make_sub_pool(p));
++  res = sqlconf_dispatch(cmd, "sql_prepare");
++  destroy_pool(cmd->pool);
++
++  /* Define the connection we'll be making. */
++  cmd = sqlconf_cmd_alloc(p, 4, "sqlconf", sqlconf_db.user, sqlconf_db.pass,
++     pstrcat(p, sqlconf_db.database, "@", sqlconf_db.server, NULL));
++  res = sqlconf_dispatch(cmd, "sql_define_conn");
++  destroy_pool(cmd->pool);
++
++  if (!res) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": error defining database connection");
++    errno = EINVAL;
++    return -1;
++  }
++
++  /* Open a connection to the database. */
++  cmd = sqlconf_cmd_alloc(p, 1, "sqlconf");
++  res = sqlconf_dispatch(cmd, "sql_open_conn");
++  destroy_pool(cmd->pool);
++
++  if (!res) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": error opening database connection");
++    errno = EINVAL;
++    return -1;
++  }
++
++  /* Do the database digging. To start things off, we need to find the
++   * "server config"/default context.  If we've been given a base context,
++   * look for the ID of the context with that name, otherwise, look for the
++   * context whose ID is NULL.
++   */
++  if (!sqlconf_ctxts.base_id) {
++    where = pstrcat(p, sqlconf_ctxts.parent_id, " IS NULL", NULL);
++    which_id = "default";
++
++  } else {
++    where = pstrcat(p, sqlconf_ctxts.id, " = ", sqlconf_ctxts.base_id, NULL);
++    which_id = "base";
++  }
++
++  cmd = sqlconf_cmd_alloc(p, 4, "sqlconf", sqlconf_ctxts.tab,
++    sqlconf_ctxts.id, where);
++
++  res = sqlconf_dispatch(cmd, "sql_select");
++  if (!res) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": error retrieving %s context ID", which_id);
++    errno = EPERM;
++    return -1;
++  }
++
++  sd = res->data;
++
++  /* We only want _one_ unique base context.  Any more than that is a
++   * configuration error in the database.
++   */
++  if (sd->rnum != 1 &&
++      sd->fnum != 1) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": retrieving %s context failed: bad/non-unique results", which_id);
++    errno = EPERM;
++    return -1;
++  }
++
++  if (sd->data == NULL ||
++      sd->data[0] == NULL) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": retrieving %s context failed: no matching results", which_id);
++    errno = EPERM;
++    return -1;
++  }
++
++  id = atoi(sd->data[0]);
++  destroy_pool(cmd->pool);
++
++  sqlconf_conf = make_array(sqlconf_pool, 1, sizeof(char *));
++  sqlconf_read_ctxt(p, id, TRUE);
++
++  /* Close the connection. */
++  cmd = sqlconf_cmd_alloc(p, 2, "sqlconf", "1");
++  res = sqlconf_dispatch(cmd, "sql_close_conn");
++  destroy_pool(cmd->pool);
++
++  if (!res) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": error closing database connection");
++    errno = EINVAL;
++    return -1;
++  }
++
++  /* Cleanup the SQL subsystem. */
++  cmd = sqlconf_cmd_alloc(p, 0);
++  res = sqlconf_dispatch(cmd, "sql_cleanup");
++  destroy_pool(cmd->pool);
++
++  if (!res) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION
++      ": error cleaning up SQL system");
++    errno = EINVAL;
++    return -1;
++  }
++
++  return 0;
++}
++
++/* FSIO callbacks
++ */
++
++static int sqlconf_fsio_lstat_cb(pr_fs_t *fs, const char *path,
++    struct stat *st) {
++  return 0;
++}
++
++static int sqlconf_fsio_open_cb(pr_fh_t *fh, const char *path, int flags) {
++
++  /* Is this a path that we can use? */
++  if (strncmp("sql://", path, 6) == 0) {
++    char *uri = pstrdup(sqlconf_pool, path);
++
++    /* Parse through the given URI, breaking out the needed pieces. */
++    if (sqlconf_parse_uri(uri) < 0)
++      return -1;
++
++    /* Return a fake file descriptor. */
++    return 2476;
++  }
++
++  /* Default normal open. */
++  return open(path, flags, PR_OPEN_MODE);
++}
++
++static int sqlconf_fsio_read_cb(pr_fh_t *fh, int fd, char *buf, size_t buflen) {
++
++  /* Make sure this filehandle is for this module before trying to use it. */
++  if (fh->fh_path &&
++      strncmp("sql://", fh->fh_path, 6) == 0) {
++
++    if (!sqlconf_conf &&
++        sqlconf_read_db(fh->fh_pool) < 0) {
++      return -1;
++    }
++ 
++    if (sqlconf_confi < sqlconf_conf->nelts) {
++      char **lines = sqlconf_conf->elts;
++     
++      /* Read from our built-up buffer, until there are no more lines to be
++       * read.
++       */
++      pr_log_debug(DEBUG5, MOD_CONF_SQL_VERSION ": %s", lines[sqlconf_confi]);
++      memcpy(buf, lines[sqlconf_confi++], buflen);
++      return strlen(buf);
++    }
++
++    return 0;
++  }
++
++  /* Default normal read. */
++  return read(fd, buf, buflen);
++}
++
++/* Event handlers
++ */
++
++static void sqlconf_postparse_ev(const void *event_data, void *user_data) {
++
++  /* Unregister the registered FS. */
++  if (pr_unregister_fs("sql://") < 0) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION ": error unregistering fs: %s",
++      strerror(errno));
++
++  } else {
++    pr_log_debug(DEBUG8, MOD_CONF_SQL_VERSION ": fs unregistered");
++  }
++
++  /* Destroy the module pool. */
++  if (sqlconf_pool) {
++    destroy_pool(sqlconf_pool);
++    sqlconf_pool = NULL;
++  }
++}
++
++static void sqlconf_restart_ev(const void *event_data, void *user_data) {
++
++  /* Register the FS object. */
++  sqlconf_register();
++}
++
++/* Initialization functions
++ */
++
++static void sqlconf_register(void) {
++  pr_fs_t *fs = NULL;
++
++  sqlconf_pool = make_sub_pool(permanent_pool);
++
++  /* Register a FS object, with which we will watch for 'sql://' files
++   * being opened, and intercept them.
++   */
++  fs = pr_register_fs(sqlconf_pool, "sqlconf", "sql://");
++  if (fs == NULL) {
++    pr_log_debug(DEBUG0, MOD_CONF_SQL_VERSION ": error registering fs: %s",
++      strerror(errno));
++    return;
++  }
++  pr_log_debug(DEBUG10, MOD_CONF_SQL_VERSION ": registered 'sqlconf' fs");
++
++  /* Add the module's custom FS callbacks here. This module does not
++   * provide callbacks for most of the operations.
++   */
++  fs->lstat = sqlconf_fsio_lstat_cb;
++  fs->open = sqlconf_fsio_open_cb;
++  fs->read = sqlconf_fsio_read_cb;
++}
++
++static int sqlconf_init(void) {
++
++  /* Register the FS object. */
++  sqlconf_register();
++
++  /* Register event handlers. */
++  pr_event_register(&conf_sql_module, "core.postparse", sqlconf_postparse_ev,
++    NULL);
++  pr_event_register(&conf_sql_module, "core.restart", sqlconf_restart_ev,
++    NULL);
++
++  return 0;
++}
++
++/* Module API tables
++ */
++
++module conf_sql_module = {
++  NULL, NULL,
++
++  /* Module API version 2.0 */
++  0x20,
++
++  /* Module name */
++  "conf_sql",
++
++  /* Module configuration handler table */
++  NULL,
++
++  /* Module command handler table */
++  NULL,
++
++  /* Module authentication handler table */
++  NULL,
++
++  /* Module initialization function */
++  sqlconf_init,
++
++  /* Session initialization function */
++  NULL,
++
++  /* Module version */
++  MOD_CONF_SQL_VERSION
++};
+diff -rduN proftpd-1.3.4b/contrib/mod_dbacl.c proftpd-1.3.4b_bak/contrib/mod_dbacl.c
+--- proftpd-1.3.4b/contrib/mod_dbacl.c	1970-01-01 08:00:00.000000000 +0800
++++ proftpd-1.3.4b_bak/contrib/mod_dbacl.c	2012-09-19 16:11:44.000000000 +0800
+@@ -0,0 +1,1123 @@
++/*
++ * ProFTPD: mod_dbacl -- a module for checking access control lists in a DB
++ *
++ * Copyright (c) 2011 TJ Saunders
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307, USA.
++ *
++ * As a special exemption, TJ Saunders and other respective copyright holders
++ * give permission to link this program with OpenSSL, and distribute the
++ * resulting executable, without including the source code for OpenSSL in the
++ * source distribution.
++ *
++ * This is mod_dbacl, contrib software for proftpd 1.3.x and above.
++ * For more information contact TJ Saunders <tj@castaglia.org>.
++ *
++ * $Id: mod_dbacl.c,v 1.1 2011/05/11 17:51:09 tj Exp tj $
++ */
++
++#include "conf.h"
++#include "privs.h"
++
++#define MOD_DBACL_VERSION		"mod_dbacl/0.0"
++
++/* Make sure the version of proftpd is as necessary. */
++#if PROFTPD_VERSION_NUMBER < 0x0001030403
++# error "ProFTPD 1.3.4rc3 or later required"
++#endif
++
++module dbacl_module;
++
++#define DBACL_POLICY_ALLOW	1
++#define DBACL_POLICY_DENY	2
++
++static int dbacl_engine = FALSE;
++static int dbacl_policy = DBACL_POLICY_ALLOW;
++
++#define DBACL_DEFAULT_TABLE		"ftpacl"
++#define DBACL_DEFAULT_PATH_COL		"path"
++#define DBACL_DEFAULT_READ_COL		"read_acl"
++#define DBACL_DEFAULT_WRITE_COL		"write_acl"
++#define DBACL_DEFAULT_DELETE_COL	"delete_acl"
++#define DBACL_DEFAULT_CREATE_COL	"create_acl"
++#define DBACL_DEFAULT_MODIFY_COL	"modify_acl"
++#define DBACL_DEFAULT_MOVE_COL		"move_acl"
++#define DBACL_DEFAULT_VIEW_COL		"view_acl"
++#define DBACL_DEFAULT_NAVIGATE_COL	"navigate_acl"
++
++static const char *dbacl_table = DBACL_DEFAULT_TABLE;
++static const char *dbacl_path_col = DBACL_DEFAULT_PATH_COL;
++static const char *dbacl_read_col = DBACL_DEFAULT_READ_COL;
++static const char *dbacl_write_col = DBACL_DEFAULT_WRITE_COL;
++static const char *dbacl_delete_col = DBACL_DEFAULT_DELETE_COL;
++static const char *dbacl_create_col = DBACL_DEFAULT_CREATE_COL;
++static const char *dbacl_modify_col = DBACL_DEFAULT_MODIFY_COL;
++static const char *dbacl_move_col = DBACL_DEFAULT_MOVE_COL;
++static const char *dbacl_view_col = DBACL_DEFAULT_VIEW_COL;
++static const char *dbacl_navigate_col = DBACL_DEFAULT_NAVIGATE_COL;
++
++static const char *dbacl_where_clause = NULL;
++
++/* SQLNamedConnectInfo to use, if any.  Note that it would be better if
++ * mod_sql.h made the MOD_SQL_DEF_CONN_NAME macro public.
++ */
++static const char *dbacl_conn_name = "default";
++
++static const char *trace_channel = "dbacl";
++
++static cmd_rec *dbacl_cmd_create(pool *parent_pool, int argc, ...) {
++  pool *cmd_pool = NULL;
++  cmd_rec *cmd = NULL;
++  register unsigned int i = 0;
++  va_list argp;
++
++  cmd_pool = make_sub_pool(parent_pool);
++  cmd = (cmd_rec *) pcalloc(cmd_pool, sizeof(cmd_rec));
++  cmd->pool = cmd_pool;
++
++  cmd->argc = argc;
++  cmd->argv = (char **) pcalloc(cmd->pool, argc * sizeof(char *));
++
++  /* Hmmm... */
++  cmd->tmp_pool = cmd->pool;
++
++  va_start(argp, argc);
++  for (i = 0; i < argc; i++)
++    cmd->argv[i] = va_arg(argp, char *);
++  va_end(argp);
++
++  return cmd;
++}
++
++static char *dbacl_escape_str(pool *p, char *str) {
++  cmdtable *sql_cmdtab;
++  cmd_rec *sql_cmd;
++  modret_t *sql_res;
++
++  /* Find the cmdtable for the sql_escapestr command. */
++  sql_cmdtab = pr_stash_get_symbol(PR_SYM_HOOK, "sql_escapestr", NULL, NULL);
++  if (sql_cmdtab == NULL) {
++    pr_trace_msg(trace_channel, 3, "%s",
++      "error: unable to find SQL hook symbol 'sql_escapestr'");
++    return str;
++  }
++
++  if (strlen(str) == 0) {
++    return str;
++  }
++
++  sql_cmd = dbacl_cmd_create(p, 1, pr_str_strip(p, str));
++
++  /* Call the handler. */
++  sql_res = pr_module_call(sql_cmdtab->m, sql_cmdtab->handler, sql_cmd);
++
++  /* Check the results. */
++  if (MODRET_ISDECLINED(sql_res) ||
++      MODRET_ISERROR(sql_res)) {
++    pr_trace_msg(trace_channel, 3, "%s",
++      "error executing 'sql_escapestring'");
++    return str;
++  }
++
++  return sql_res->data;
++}
++
++static array_header *dbacl_split_path(pool *p, char *path) {
++  char *dup_path, *ptr;
++  size_t dup_pathlen;
++  array_header *elts;
++
++  dup_pathlen = strlen(path);
++  dup_path = pstrndup(p, path, dup_pathlen);
++
++  if (dup_pathlen == 1) {
++    /* Just "/" here. */
++    elts = make_array(p, 1, sizeof(char **));
++    *((char **) push_array(elts)) = pstrdup(p, "/");
++
++    return elts;
++  }
++
++  /* If the last character is a path separator, trim it off. */
++  if (dup_path[dup_pathlen-1] == '/') {
++    dup_path[dup_pathlen-1] = '\0';
++    dup_pathlen--;
++  }
++
++  /* Start looking for path separators, just past the first character. */
++  ptr = strchr(dup_path + 1, '/');
++  if (ptr == NULL) {
++    pr_trace_msg(trace_channel, 2,
++      "unable to split path '%s': no usable path separators found", path);
++    errno = EINVAL;
++    return NULL;
++  }
++
++  /* The goal here is to a split a path like:
++   *
++   *  /home/user/dir/file.txt
++   *
++   * Into a list of paths like so:
++   *
++   *  /home
++   *  /home/user
++   *  /home/user/dir
++   *  /home/user/dir/file.txt
++   */
++
++  elts = make_array(p, 2, sizeof(char **));
++
++  while (ptr != NULL) {
++    *ptr = '\0';
++
++    pr_signals_handle();
++
++    *((char **) push_array(elts)) = pstrdup(p, dup_path);
++    *ptr = '/';
++
++    ptr = strchr(ptr + 1, '/');
++  }
++
++  /* And don't forget the full path itself. */
++  *((char **) push_array(elts)) = pstrdup(p, dup_path);
++
++  return elts;
++}
++
++static char *dbacl_get_path_skip_opts(cmd_rec *cmd) {
++  char *ptr, *path = NULL;
++
++  if (cmd->arg == NULL) {
++    errno = ENOENT;
++    return NULL;
++  }
++
++  ptr = path = cmd->arg;
++
++  while (isspace((int) *ptr)) {
++    pr_signals_handle();
++    ptr++;
++  }
++
++  if (*ptr == '-') {
++    /* Options are found; skip past the leading whitespace. */
++    path = ptr;
++  }
++
++  while (path &&
++         *path == '-') {
++
++    /* Advance to the next whitespace */
++    while (*path != '\0' &&
++           !isspace((int) *path)) {
++      path++;
++    }
++
++    ptr = path;
++
++    while (*ptr &&
++           isspace((int) *ptr)) {
++      pr_signals_handle();
++      ptr++;
++    }
++
++    if (*ptr == '-') {
++      /* Options are found; skip past the leading whitespace. */
++      path = ptr;
++
++    } else if (*(path + 1) == ' ') {
++      /* If the next character is a blank space, advance just one character. */
++      path++;
++      break;
++
++    } else {
++      path = ptr;
++      break;
++    }
++  }
++
++  return path;
++}
++
++static char *dbacl_get_path(cmd_rec *cmd, const char *proto) {
++  char *path = NULL, *abs_path = NULL;
++
++  if (strncasecmp(proto, "ftp", 4) == 0) {
++    if (pr_cmd_cmp(cmd, PR_CMD_SITE_ID) == 0) {
++        if (strncasecmp(cmd->argv[1], "CHMOD", 6) == 0 ||
++            strncasecmp(cmd->argv[1], "CHGRP", 6) == 0) {
++          register unsigned int i;
++
++          path = "";
++          for (i = 3; i < cmd->argc; i++) {
++            path = pstrcat(cmd->tmp_pool, path, *path ? " " : "", cmd->argv[i],
++              NULL);
++          }
++        }
++
++    } else if (pr_cmd_cmp(cmd, PR_CMD_LIST_ID) == 0 ||
++               pr_cmd_cmp(cmd, PR_CMD_NLST_ID) == 0) {
++      path = dbacl_get_path_skip_opts(cmd);
++
++    } else if (pr_cmd_cmp(cmd, PR_CMD_PWD_ID) == 0 ||
++               pr_cmd_cmp(cmd, PR_CMD_XPWD_ID) == 0) {
++      path = (char *) pr_fs_getcwd();
++
++    } else {
++      path = cmd->arg;
++    }
++
++  } else if (strncasecmp(proto, "sftp", 5) == 0) {
++    path = cmd->arg;
++
++  } else {
++    pr_trace_msg(trace_channel, 1,
++      "unable to get path from command: unsupported protocol '%s'", proto);
++    errno = EINVAL;
++    return NULL;
++  }
++
++  abs_path = dir_abs_path(cmd->tmp_pool, path, TRUE);
++  if (abs_path == NULL) {
++    int xerrno = errno;
++
++    pr_trace_msg(trace_channel, 1, "error resolving '%s': %s", path,
++      strerror(xerrno));
++
++    errno = EINVAL;
++    return NULL;
++  }
++
++  pr_trace_msg(trace_channel, 17, "resolved path '%s' to '%s'", path, abs_path);
++  return abs_path;
++}
++
++static const char *dbacl_get_column(cmd_rec *cmd, const char *proto) {
++  const char *col = NULL;
++
++  if (pr_cmd_cmp(cmd, PR_CMD_RETR_ID) == 0) {
++    col = dbacl_read_col;
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_STOR_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_APPE_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_STOU_ID) == 0) {
++    col = dbacl_write_col;
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_DELE_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_RMD_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_XRMD_ID) == 0) {
++    col = dbacl_delete_col;
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_MKD_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_XMKD_ID) == 0) {
++    col = dbacl_create_col;
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_MFMT_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_MFF_ID) == 0) {
++    col = dbacl_modify_col;
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_RNFR_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_RNTO_ID) == 0) {
++    col = dbacl_move_col;
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_LIST_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_MLSD_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_MLST_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_NLST_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_STAT_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_MDTM_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_SIZE_ID) == 0) {
++    col = dbacl_view_col;
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_CDUP_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_XCUP_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_CWD_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_XCWD_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_PWD_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_XPWD_ID) == 0) {
++    col = dbacl_navigate_col;
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_SITE_ID) == 0) {
++    if (strncasecmp(cmd->argv[1], "CHMOD", 6) == 0 ||
++        strncasecmp(cmd->argv[1], "CHGRP", 6) == 0) {
++      col = dbacl_modify_col;
++
++    } else if (strncasecmp(cmd->argv[1], "CPTO", 5) == 0) {
++      col = dbacl_move_col;
++    }
++
++  } else if (strncasecmp(proto, "sftp", 5) == 0) {
++    /* Mapping of SFTP requests to ACLs */
++
++    if (pr_cmd_strcmp(cmd, "LSTAT") == 0 ||
++        pr_cmd_strcmp(cmd, "OPENDIR") == 0 ||
++        pr_cmd_strcmp(cmd, "READLINK") == 0) {
++      col = dbacl_view_col;
++
++    } else if (pr_cmd_strcmp(cmd, "REALPATH") == 0) {
++      col = dbacl_navigate_col;
++
++    } else if (pr_cmd_strcmp(cmd, "SETSTAT") == 0 ||
++               pr_cmd_strcmp(cmd, "FSETSTAT") == 0) {
++      col = dbacl_modify_col;
++
++    } else if (pr_cmd_strcmp(cmd, "RENAME") == 0) {
++      col = dbacl_move_col;
++
++    } else if (pr_cmd_strcmp(cmd, "SYMLINK") == 0 ||
++               pr_cmd_strcmp(cmd, "LINK") == 0) {
++      col = dbacl_create_col;
++    }
++  }
++
++  return col;
++}
++
++static int dbacl_is_boolean(const char *str) {
++  int res;
++
++  res = pr_str_is_boolean(str);
++  if (res < 0) {
++    if (errno == EINVAL) {
++      /* Treat 'allow(ed)' and 'den(y|ied)' as acceptable Boolean values
++       * as well.
++       */
++      if (strncasecmp(str, "allow", 6) == 0 ||
++          strncasecmp(str, "allowed", 8) == 0) {
++        res = TRUE;
++
++      } else if (strncasecmp(str, "deny", 5) == 0 ||
++                 strncasecmp(str, "denied", 7) == 0) {
++        res = FALSE;
++
++      } else {
++        pr_trace_msg(trace_channel, 6,
++          "unable to interpret database value '%s' as Boolean value", str);
++      }
++    }
++  }
++
++  return res;
++}
++
++static int dbacl_get_row(pool *p, const char *acl_col,
++    array_header *path_elts) {
++  register unsigned int i;
++  cmd_rec *sql_cmd = NULL;
++  char *query = NULL, *query_name = NULL, **elts, **values;
++  array_header *list_elts, *sql_data = NULL;
++  cmdtable *sql_cmdtab = NULL;
++  modret_t *sql_res = NULL;
++
++  /* Sanitize the path components in the list we'll be used, to avoid any
++   * SQL injection attacks.
++   */
++  list_elts = make_array(p, path_elts->nelts, sizeof(char **));
++  elts = path_elts->elts;
++  for (i = 0; i < path_elts->nelts; i++) {
++    *((char **) push_array(list_elts)) = dbacl_escape_str(p, elts[i]);
++  }
++
++  /* SQL query to use:
++   *
++   *  SELECT acl_col FROM dbacl_table
++   *    WHERE
++   *      path_col IN ($list)
++   *      ORDER BY LENGTH(path_col)
++   *      DESC LIMIT 1;
++   *
++   * Expand "($list)" to e.g.
++   *
++   *   ('/home', '/home/user', '/home/user/dir', '/home/user/dir/file.txt')
++   */
++
++  /* Default schema:
++   *
++   *  CREATE TABLE dbacl (
++   *    user VARCHAR NOT NULL,
++   *    group VARCHAR NOT NULL,
++   *    path VARCHAR NOT NULL,
++   *    create BOOLEAN,
++   *    modify BOOLEAN,
++   *    write BOOLEAN,
++   *    read BOOLEAN,
++   *    delete BOOLEAN,
++   *    move BOOLEAN,
++   *    view BOOLEAN,
++   *  );
++   */
++
++  /* Find the cmdtable for the sql_lookup command. */
++  sql_cmdtab = pr_stash_get_symbol(PR_SYM_HOOK, "sql_lookup", NULL, NULL);
++  if (sql_cmdtab == NULL) {
++    pr_trace_msg(trace_channel, 3, "%s",
++      "error: unable to find SQL hook symbol 'sql_lookup'");
++    errno = EPERM;
++    return -1;
++  }
++
++  /* Build up the query to use, including WHERE clause. */
++  query = pstrcat(p, acl_col, " FROM ", dbacl_table, " WHERE ", NULL);
++
++  if (dbacl_where_clause != NULL) {
++    query = pstrcat(p, query, "(", dbacl_where_clause, ") AND ", NULL);
++  }
++
++  query = pstrcat(p, query, dbacl_path_col, " IN (", NULL);
++
++  elts = list_elts->elts;
++  for (i = 0; i < list_elts->nelts; i++) {
++    query = pstrcat(p, query, "'", elts[i], "'", NULL);
++
++    if (i != (list_elts->nelts-1)) {
++      /* Only append the comma separator if we are not the last item in the
++       * list.
++       */
++      query = pstrcat(p, query, ", ", NULL);
++    }
++  }
++
++  query = pstrcat(p, query, ") ORDER BY LENGTH(", dbacl_path_col,
++    ") DESC LIMIT 1", NULL);
++
++  pr_trace_msg(trace_channel, 7, "constructed query '%s'", query);
++
++  /* Cheat, and programmatically create a SQLNamedQuery for this query. */
++  query_name = pstrcat(p, "SQLNamedQuery_", MOD_DBACL_VERSION, NULL);
++
++  add_config_param_set(&(main_server->conf), query_name, 3, "SELECT", query,
++    dbacl_conn_name);
++
++  sql_cmd = dbacl_cmd_create(p, 2, "sql_lookup", MOD_DBACL_VERSION);
++
++  /* Call the handler. */
++  sql_res = pr_module_call(sql_cmdtab->m, sql_cmdtab->handler, sql_cmd);
++
++  /* Check the results. */
++  if (MODRET_ISDECLINED(sql_res) ||
++      MODRET_ISERROR(sql_res)) {
++    pr_trace_msg(trace_channel, 2,
++      "error processing SQL query '%s', check SQLLogFile for details", query);
++    errno = EPERM;
++    return -1;
++  }
++
++  /* Remove the SQLNamedQuery. */
++  (void) remove_config(main_server->conf, query_name, FALSE);
++
++  sql_data = (array_header *) sql_res->data;
++
++  if (sql_data->nelts == 0) {
++    pr_trace_msg(trace_channel, 8, "query '%s' returned no matching rows",
++      query);
++    errno = ENOENT;
++    return -1;
++  }
++
++  if (sql_data->nelts != 1) {
++    pr_trace_msg(trace_channel, 5,
++      "query '%s' returned incorrect number of values (%d)", query,
++      sql_data->nelts);
++    errno = EINVAL;
++    return -1;
++  }
++
++  values = (char **) sql_data->elts;
++
++  pr_trace_msg(trace_channel, 8,
++    "query '%s' returned value '%s'", query, values[0]);
++
++  return dbacl_is_boolean(values[0]);
++}
++
++static int dbacl_get_path_acl(cmd_rec *cmd, const char *acl_col, char *path,
++    int *policy) {
++  array_header *path_elts;
++  int res;
++
++  path_elts = dbacl_split_path(cmd->tmp_pool, path);
++  if (path_elts == NULL) {
++    int xerrno = errno;
++
++    pr_trace_msg(trace_channel, 4,
++      "error splitting path '%s': %s", path, strerror(xerrno));
++
++    errno = xerrno;
++    return -1;
++  }
++
++  if (pr_trace_get_level(trace_channel) >= 9) {
++    register unsigned int i;
++    char **elts;
++
++    pr_trace_msg(trace_channel, 9,
++      "split path '%s' into the following list:", path);
++
++    elts = path_elts->elts;
++    for (i = 0; i < path_elts->nelts; i++) {
++      pr_trace_msg(trace_channel, 9,
++        "path component #%u: '%s'", i+1, elts[i]);
++    }
++  }
++
++  res = dbacl_get_row(cmd->tmp_pool, acl_col, path_elts);
++  if (res < 0) {
++    int xerrno = errno;
++
++    pr_trace_msg(trace_channel, 4,
++      "error getting database row for ACL column '%s', path '%s': %s",
++      acl_col, path, strerror(xerrno));
++
++    errno = xerrno;
++    return -1;
++  }
++
++  if (res == FALSE) {
++    char *cmd_name;
++
++    cmd_name = cmd->argv[0];
++    if (pr_cmd_cmp(cmd, PR_CMD_SITE_ID) == 0) {
++      cmd_name = pstrcat(cmd->tmp_pool, cmd->argv[0], " ", cmd->argv[1], NULL);
++    }
++
++    pr_trace_msg(trace_channel, 9,
++      "command '%s' on path '%s' explicitly denied by table '%s', column '%s'",
++      cmd_name, path, dbacl_table, acl_col);
++
++    *policy = DBACL_POLICY_DENY;
++
++  } else {
++    char *cmd_name;
++
++    cmd_name = cmd->argv[0];
++    if (pr_cmd_cmp(cmd, PR_CMD_SITE_ID) == 0) {
++      cmd_name = pstrcat(cmd->tmp_pool, cmd->argv[0], " ", cmd->argv[1], NULL);
++    }
++
++    pr_trace_msg(trace_channel, 9,
++      "command '%s' on path '%s' explicitly allowed by table '%s', column '%s'",
++      cmd_name, path, dbacl_table, acl_col);
++
++    *policy = DBACL_POLICY_ALLOW;
++  }
++
++  return res;
++}
++
++static int dbacl_get_acl(cmd_rec *cmd, const char *proto, int *policy) {
++  const char *acl_col;
++  char *path;
++  int res;
++
++  acl_col = dbacl_get_column(cmd, proto);
++  if (acl_col == NULL) {
++    pr_trace_msg(trace_channel, 4,
++      "no mapping of command '%s' to ACL column", cmd->argv[0]);
++    return -1;
++  }
++
++  /* We need to handle SFTP LINK/SYMLINK requests differently, since
++   * they a) involve two paths and b) have no direct FTP equivalents.
++   *
++   * XXX What about mod_site_misc's SITE SYMLINK?
++   */
++
++  if (strncasecmp(proto, "ftp", 4) == 0 ||
++      strncasecmp(proto, "ftps", 5) == 0 ) {
++    path = dbacl_get_path(cmd, proto);
++    if (path == NULL) {
++      pr_trace_msg(trace_channel, 4,
++        "unable to get full path for command '%s'", cmd->argv[0]);
++      return -1;
++    }
++
++    res = dbacl_get_path_acl(cmd, acl_col, path, policy);
++    if (res < 0) {
++      return res;
++    }
++
++    return 0;
++
++  } else if (strncasecmp(proto, "sftp", 5) == 0) {
++    if (pr_cmd_strcmp(cmd, "SYMLINK") != 0 &&
++        pr_cmd_strcmp(cmd, "LINK") != 0) {
++
++      path = dbacl_get_path(cmd, proto);
++      if (path == NULL) {
++        pr_trace_msg(trace_channel, 4,
++          "unable to get full path for command '%s'", cmd->argv[0]);
++        return -1;
++      }
++
++      res = dbacl_get_path_acl(cmd, acl_col, path, policy);
++      if (res < 0) {
++        return res;
++      }
++
++      return 0;
++
++    } else {
++      char *arg, *ptr;
++
++      arg = pstrdup(cmd->tmp_pool, cmd->arg);
++      ptr = strchr(arg, '\t');
++      if (ptr == NULL) {
++        /* Malformed SFTP SYMLINK/LINK cmd_rec. */
++        pr_trace_msg(trace_channel, 1,
++          "malformed SFTP %s request, ignoring", cmd->argv[0]);
++        errno = EINVAL;
++        return -1;
++      }
++
++      *ptr = '\0';
++
++      /* Check source path first. */
++      path = arg;
++
++      /* XXX Need to absolutize this path */
++
++      res = dbacl_get_path_acl(cmd, acl_col, path, policy);
++      if (res < 0) {
++        return res;
++      }
++
++      if (*policy == DBACL_POLICY_DENY) {
++        /* Source path is denied; reject the request. */
++        return 0;
++      }
++
++      /* Check destination path next. */
++      path = ptr + 1;
++
++      /* XXX Need to absolutize this path */
++
++      res = dbacl_get_path_acl(cmd, acl_col, path, policy);
++      if (res < 0) {
++        return res;
++      }
++
++      return 0;
++    }
++  }
++
++  errno = ENOSYS;
++  return -1;
++}
++
++static void dbacl_set_error_response(cmd_rec *cmd, const char *msg) {
++
++  /* Command-specific error code/message */
++  if (pr_cmd_cmp(cmd, PR_CMD_CDUP_ID) == 0 ||
++      pr_cmd_cmp(cmd, PR_CMD_XCUP_ID) == 0) {
++    pr_response_add_err(R_550, "%s", msg);
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_LIST_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_NLST_ID) == 0) {
++    size_t arglen;
++
++    /* We have may received bare LIST/NLST commands, or just options and no
++     * paths.  Do The Right Thing(tm) with these scenarios.
++     */
++
++    arglen = strlen(cmd->arg);
++    if (arglen == 0) {
++      /* No options, no path. */
++      pr_response_add_err(R_450, ".: %s", msg);
++       
++    } else {
++      char *path;
++
++      path = dbacl_get_path_skip_opts(cmd);
++
++      arglen = strlen(path);
++      if (arglen == 0) {
++        /* Only options, no path. */
++        pr_response_add_err(R_450, ".: %s", msg);
++
++      } else {
++        pr_response_add_err(R_450, "%s: %s", cmd->arg, msg);
++      }
++    }
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_MFMT_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_MFF_ID) == 0) {
++    pr_response_add_err(R_550, "%s: %s", cmd->argv[2], msg);
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_MLSD_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_MLST_ID) == 0) {
++    size_t arglen;
++
++    arglen = strlen(cmd->arg);
++    if (arglen == 0) {
++
++      /* No path. */
++      pr_response_add_err(R_550, ".: %s", msg);
++
++    } else {
++      pr_response_add_err(R_550, "%s: %s", cmd->arg, msg);
++    }
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_STAT_ID) == 0) {
++    size_t arglen;
++
++    arglen = strlen(cmd->arg);
++    if (arglen == 0) {
++
++      /* No path. */
++      pr_response_add_err(R_550, "%s", msg);
++
++    } else {
++      pr_response_add_err(R_550, "%s: %s", cmd->arg, msg);
++    }
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_PWD_ID) == 0 ||
++             pr_cmd_cmp(cmd, PR_CMD_XPWD_ID) == 0) {
++    pr_response_add_err(R_550, "%s", msg);
++
++  } else if (pr_cmd_cmp(cmd, PR_CMD_SITE_ID) == 0) {
++    register unsigned int i;
++    char *arg = "";
++
++    if (strncasecmp(cmd->argv[1], "CHMOD", 6) == 0 ||
++        strncasecmp(cmd->argv[1], "CHGRP", 6) == 0) {
++
++      for (i = 3; i < cmd->argc; i++) {
++        arg = pstrcat(cmd->tmp_pool, arg, *arg ? " " : "", cmd->argv[i], NULL);
++      }
++
++    } else {
++      /* XXX Refine this case for other SITE commands. */
++
++      for (i = 2; i < cmd->argc; i++) {
++        arg = pstrcat(cmd->tmp_pool, arg, *arg ? " " : "", cmd->argv[i], NULL);
++      }
++    }
++
++    pr_response_add_err(R_550, "%s: %s", arg, msg);
++
++  } else {
++    pr_response_add_err(R_550, "%s: %s", cmd->arg, msg);
++  }
++}
++
++/* XXX NOTES:
++ *
++ *  Look up relevant row, using _escaped_ path, acl name, uid/user, gid/group
++ *    Hint: index on the lookup columns: path, and columns in WHERE clause.
++ */
++
++/* Configuration handlers
++ */
++
++/* usage: DBACLEngine on|off */
++MODRET set_dbaclengine(cmd_rec *cmd) {
++  int bool = -1;
++  config_rec *c = NULL;
++
++  CHECK_ARGS(cmd, 1);
++  CHECK_CONF(cmd, CONF_ROOT|CONF_VIRTUAL|CONF_GLOBAL);
++
++  bool = get_boolean(cmd, 1);
++  if (bool == -1) {
++    CONF_ERROR(cmd, "expected Boolean parameter");
++  }
++
++  c = add_config_param(cmd->argv[0], 1, NULL);
++  c->argv[0] = pcalloc(c->pool, sizeof(int));
++  *((int *) c->argv[0]) = bool;
++
++  return PR_HANDLED(cmd);
++}
++
++/* usage: DBACLPolicy policy */
++MODRET set_dbaclpolicy(cmd_rec *cmd) {
++  config_rec *c;
++  int policy;
++
++  CHECK_ARGS(cmd, 1);
++  CHECK_CONF(cmd, CONF_ROOT|CONF_VIRTUAL|CONF_GLOBAL);
++
++  if (strncasecmp(cmd->argv[1], "allow", 6) == 0) {
++    policy = DBACL_POLICY_ALLOW;
++
++  } else if (strncasecmp(cmd->argv[1], "deny", 5) == 0) {
++    policy = DBACL_POLICY_DENY;
++
++  } else {
++    CONF_ERROR(cmd, pstrcat(cmd->tmp_pool, "uknown DBACLPolicy '",
++      cmd->argv[1], "'", NULL));
++  }
++
++  c = add_config_param(cmd->argv[0], 1, NULL);
++  c->argv[0] = palloc(c->pool, sizeof(int));
++  *((int *) c->argv[0]) = policy;
++
++  return PR_HANDLED(cmd);
++}
++
++/* usage: DBACLSchema table [cols] [conn-name] */
++MODRET set_dbaclschema(cmd_rec *cmd) {
++
++  if (cmd->argc-1 != 1 &&
++      cmd->argc-1 != 10 &&
++      cmd->argc-1 != 11) {
++    CONF_ERROR(cmd, "wrong number of parameters");
++  }
++
++  CHECK_CONF(cmd, CONF_ROOT|CONF_VIRTUAL|CONF_GLOBAL);
++
++  if (cmd->argc-1 == 1) {
++    /* Just the table name. */
++    (void) add_config_param_str(cmd->argv[0], 1, cmd->argv[1]);
++    return PR_HANDLED(cmd);
++
++  } else if (cmd->argc-1 == 10) {
++    /* Table name and column names. */
++    (void) add_config_param_str(cmd->argv[0], 10, cmd->argv[1], cmd->argv[2],
++      cmd->argv[3], cmd->argv[4], cmd->argv[5], cmd->argv[6], cmd->argv[7],
++      cmd->argv[8], cmd->argv[9], cmd->argv[10]);
++
++  } else if (cmd->argc-1 == 11) {
++
++    /* Table name, column names, and connection name. */
++    (void) add_config_param_str(cmd->argv[0], 11, cmd->argv[1], cmd->argv[2],
++      cmd->argv[3], cmd->argv[4], cmd->argv[5], cmd->argv[6], cmd->argv[7],
++      cmd->argv[8], cmd->argv[9], cmd->argv[10], cmd->argv[11]);
++  }
++
++  return PR_HANDLED(cmd);
++}
++
++/* usage: DBACLWhereClause clause */
++MODRET set_dbaclwhereclause(cmd_rec *cmd) {
++  CHECK_ARGS(cmd, 1);
++  CHECK_CONF(cmd, CONF_ROOT|CONF_VIRTUAL|CONF_GLOBAL);
++
++  (void) add_config_param_str(cmd->argv[0], 1, cmd->argv[1]);
++  return PR_HANDLED(cmd);
++}
++
++/* Command handlers
++ */
++
++MODRET dbacl_pre_cmd(cmd_rec *cmd) {
++  int policy, res;
++  const char *proto;
++
++  if (!dbacl_engine) {
++    return PR_DECLINED(cmd);
++  }
++
++  proto = pr_session_get_protocol(0);
++
++  res = dbacl_get_acl(cmd, proto, &policy);
++  if (res < 0) {
++    if (dbacl_policy == DBACL_POLICY_DENY) {
++      pr_trace_msg(trace_channel, 3,
++        "error looking up ACL for %s command/resource (protocol '%s') "
++        "and 'DBACLPolicy deny' setting in effect, rejecting command",
++        cmd->argv[0], proto);
++
++      dbacl_set_error_response(cmd, strerror(EACCES));
++      errno = EACCES;
++      return PR_ERROR(cmd);
++    }
++
++    return PR_DECLINED(cmd);
++  }
++
++  if (policy == DBACL_POLICY_DENY) {
++    pr_trace_msg(trace_channel, 3,
++      "configured ACL for %s command/resource (protocol '%s') denies "
++      "access, rejecting command", cmd->argv[0], proto);
++
++    dbacl_set_error_response(cmd, strerror(EACCES));
++    errno = EACCES;
++    return PR_ERROR(cmd);
++  }
++
++  pr_trace_msg(trace_channel, 9,
++    "configured ACL for %s command/resource (protocol '%s') allows access, "
++    "permitting command", cmd->argv[0], proto);
++
++  return PR_DECLINED(cmd);
++}
++
++MODRET dbacl_post_pass(cmd_rec *cmd) {
++  config_rec *c;
++
++  c = find_config(main_server->conf, CONF_PARAM, "DBACLEngine", FALSE);
++  if (c) {
++    dbacl_engine = *((int *) c->argv[0]);
++  }
++
++  if (!dbacl_engine) {
++    return PR_DECLINED(cmd);
++  }
++
++  c = find_config(main_server->conf, CONF_PARAM, "DBACLSchema", FALSE);
++  if (c) {
++    if (c->argc == 1) {
++      dbacl_table = c->argv[0];
++
++    } else if (c->argc >= 10) {
++      dbacl_table = c->argv[0];
++
++      dbacl_path_col = c->argv[1];
++      dbacl_read_col = c->argv[2];
++      dbacl_write_col = c->argv[3];
++      dbacl_delete_col = c->argv[4];
++      dbacl_create_col = c->argv[5];
++      dbacl_modify_col = c->argv[6];
++      dbacl_move_col = c->argv[7];
++      dbacl_view_col = c->argv[8];
++      dbacl_navigate_col = c->argv[9];
++
++      if (c->argc == 11) {
++        dbacl_conn_name = c->argv[10];
++      }
++    }
++  }
++
++  if (pr_trace_get_level(trace_channel) >= 15) {
++    pr_trace_msg(trace_channel, 15,
++      "using table name '%s' for ACLs", dbacl_table);
++
++    pr_trace_msg(trace_channel, 15,
++      "using column name '%s' for paths", dbacl_path_col);
++     
++    pr_trace_msg(trace_channel, 15,
++      "using column name '%s' for the READ ACL", dbacl_read_col);
++
++    pr_trace_msg(trace_channel, 15,
++      "using column name '%s' for the WRITE ACL", dbacl_write_col);
++
++    pr_trace_msg(trace_channel, 15,
++      "using column name '%s' for the DELETE ACL", dbacl_delete_col);
++
++    pr_trace_msg(trace_channel, 15,
++      "using column name '%s' for the CREATE ACL", dbacl_create_col);
++
++    pr_trace_msg(trace_channel, 15,
++      "using column name '%s' for the MODIFY ACL", dbacl_modify_col);
++
++    pr_trace_msg(trace_channel, 15,
++      "using column name '%s' for the MOVE ACL", dbacl_move_col);
++
++    pr_trace_msg(trace_channel, 15,
++      "using column name '%s' for the VIEW ACL", dbacl_view_col);
++
++    pr_trace_msg(trace_channel, 15,
++      "using column name '%s' for the NAVIGATE ACL", dbacl_navigate_col);
++  }
++
++  c = find_config(main_server->conf, CONF_PARAM, "DBACLPolicy", FALSE);
++  if (c) {
++    dbacl_policy = *((int *) c->argv[0]);
++  }
++
++  c = find_config(main_server->conf, CONF_PARAM, "DBACLWhereClause", FALSE);
++  if (c) {
++    dbacl_where_clause = c->argv[0];
++  }
++
++  return PR_DECLINED(cmd);
++}
++
++/* Module API tables
++ */
++
++static conftable dbacl_conftab[] = {
++  { "DBACLEngine",	set_dbaclengine,	NULL },
++  { "DBACLPolicy",	set_dbaclpolicy,	NULL },
++  { "DBACLSchema",	set_dbaclschema,	NULL },
++  { "DBACLWhereClause",	set_dbaclwhereclause,	NULL },
++
++  { NULL }
++};
++
++static cmdtable dbacl_cmdtab[] = {
++  { PRE_CMD,	C_APPE,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,    C_CDUP, G_NONE, dbacl_pre_cmd,          TRUE,   FALSE },
++  { PRE_CMD,    C_XCUP, G_NONE, dbacl_pre_cmd,          TRUE,   FALSE },
++  { PRE_CMD,    C_CWD,  G_NONE, dbacl_pre_cmd,          TRUE,   FALSE },
++  { PRE_CMD,    C_XCWD, G_NONE, dbacl_pre_cmd,          TRUE,   FALSE },
++  { PRE_CMD,	C_DELE,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_LIST,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_MDTM,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_MFF,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_MFMT,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_MKD,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_XMKD,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_MLSD,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_MLST,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_NLST,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_PWD,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_XPWD,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_RETR,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_RMD,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_XRMD,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_RNFR,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_RNTO,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_SITE,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_SIZE,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_STAT,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_STOR,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++  { PRE_CMD,	C_STOU,	G_NONE,	dbacl_pre_cmd,		TRUE,	FALSE },
++
++  /* SFTP requests */
++  { PRE_CMD,	"FSETSTAT",	G_NONE,	dbacl_pre_cmd,	TRUE,	FALSE },
++  { PRE_CMD,	"LINK",		G_NONE,	dbacl_pre_cmd,	TRUE,	FALSE },
++  { PRE_CMD,	"LSTAT",	G_NONE,	dbacl_pre_cmd,	TRUE,	FALSE },
++  { PRE_CMD,	"OPENDIR",	G_NONE,	dbacl_pre_cmd,	TRUE,	FALSE },
++  { PRE_CMD,	"READLINK",	G_NONE,	dbacl_pre_cmd,	TRUE,	FALSE },
++  { PRE_CMD,	"REALPATH",	G_NONE,	dbacl_pre_cmd,	TRUE,	FALSE },
++  { PRE_CMD,	"SETSTAT",	G_NONE,	dbacl_pre_cmd,	TRUE,	FALSE },
++  { PRE_CMD,	"SYMLINK",	G_NONE,	dbacl_pre_cmd,	TRUE,	FALSE },
++
++  /* XXX Need to handle SITE CPFR, SITE CPTO, SFTP COPY */
++
++  { POST_CMD,	C_PASS,	G_NONE,	dbacl_post_pass,	FALSE,	FALSE },
++
++  { 0, NULL }
++};
++
++module dbacl_module = {
++  NULL, NULL,
++
++  /* Module API version 2.0 */
++  0x20,
++
++  /* Module name */
++  "dbacl",
++
++  /* Module configuration handler table */
++  dbacl_conftab,
++
++  /* Module command handler table */
++  dbacl_cmdtab,
++
++  /* Module authentication handler table */
++  NULL,
++
++  /* Module initialization function */
++  NULL,
++
++  /* Session initialization function */
++  NULL,
++
++  /* Module version */
++  MOD_DBACL_VERSION
++};
+diff -rduN proftpd-1.3.4b/contrib/mod_sql.c proftpd-1.3.4b_bak/contrib/mod_sql.c
+--- proftpd-1.3.4b/contrib/mod_sql.c	2011-10-04 13:27:18.000000000 +0800
++++ proftpd-1.3.4b_bak/contrib/mod_sql.c	2012-09-19 16:11:44.000000000 +0800
+@@ -2570,6 +2570,22 @@
+       }
+       break;
+ 
++    case 'G': {
++      char *login_group;
++
++      argp = arg;
++
++      login_group = pr_table_get(session.notes, "primary-group", NULL);
++      if (login_group == NULL) {
++        login_group = "root";
++      }
++
++      sstrncpy(argp, login_group, sizeof(arg));
++      break;
++    }
++
++
++
+     case 'U': {
+       char *login_user;
+ 

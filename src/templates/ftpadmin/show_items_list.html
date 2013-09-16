@@ -1,0 +1,70 @@
+{% load i18n %}
+
+
+<form name="form1" action="{{ mult_action_url }}" method="post">
+{% if mult_action_url %}
+<p>
+    <label>Action : 
+    <select name="action">
+        <option value="" selected="selected">---------</option>
+        <option value="del_items">Delete selected items</option>
+        <option value="modify_items">Modify selected items</option>
+    </select>
+    </label>
+    <input type="hidden"  value="0" name="select_across" />
+    <button type="submit" title="Run the selected action" name="index" value="0" onclick="this.form.submit()">Go</button>&nbsp;&nbsp;&nbsp;&nbsp;<span id="selected_count">0 item selected</span>
+
+</p>
+
+{% endif %}
+
+{% load FtpTags %}
+        <table cellpadding="2" cellspacing="2" rules="all"  class="list_item">
+            <tr class="titleRow">
+{% if mult_action_url %}
+            <td>
+    <input type="button" onclick="checkAll(form1,status)" value="All" class="button_select">        
+    <input type="button" onclick="switchAll(form1,status)" value="Not" class="button_select">         
+    <input type="button"  onclick="uncheckAll(form1,status)" value="Clear" class="button_select">
+            </td>
+{% endif %}
+            {% for field in show_field_list %}
+                <td><a href="{{ url_sort_prefix }}{% get_sort_by_url sort_by  field %}" name="{{ field }}" title="sort by {{ field }} ">{% trans field %}</a></td>
+            {% endfor %}
+
+            {% if has_show_list_uri_display %}
+                <td>&nbsp;</td>
+            {% endif %}
+            </tr>
+
+{% if info %}
+       {% for show_item in item_list.object_list %}
+            <tr class="defaultRow" onmouseover=" this.className = 'overRow';" onmouseout="this.className = 'defaultRow'" >
+           {% if mult_action_url %}
+                <td><input type="checkbox" value="{{ show_item.id }}" name="checked" onclick="fill_selected_value(form1,status)" /></td>
+           {% endif %}
+            {% for key, value in show_item.items %} {# 这里需要在Model文件中添加items方法才可用  key.name 代表键名称  #}
+                {% if key.name in  show_field_list %}
+                     <td>{{ value }}</td>
+                {% endif %}
+            {% endfor %}
+
+            {% if has_show_list_uri_display %}
+                 <td> 
+                {% for show_list_uri_item in show_list_uri %}
+                    <a href="{{ show_list_uri_item.url }}/{{ show_item.id }}/" title="{{ show_list_uri_item.title }}" alt="" target="{{ show_list_uri_item.target }}" >{% trans show_list_uri_item.name %}</a> &nbsp;
+                {% endfor %}
+
+                 </td>
+            {% endif %}
+            </tr>
+
+       {% endfor %} 
+
+       </table>
+{% else %}
+       </table>
+    <p style="text-align:center">{% trans "No Item For" %} [<span style="font-size:30px; font-weight:bold;"> {{ query }} </span>] !</p>
+{% endif %}
+
+</form>

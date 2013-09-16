@@ -1,0 +1,501 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2012-05-18 09:56+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0\n"
+
+
+#--------------------------------------
+#: views/ftpgroups.py:104
+msgid "Add New Group"
+msgstr "添加新用户组"
+
+msgid "Add Group"
+msgstr "添加用户组"
+
+msgid "The Name of group"
+msgstr "组名称"
+
+
+msgid "The system GID of current group"
+msgstr "组GID"
+
+
+msgid "The Descripiton of current group"
+msgstr "组简介"
+
+#---------------------------------
+
+#: views/ftpusers.py:107
+msgid "Add New User"
+msgstr "添加新用户"
+
+msgid "The Name of user"
+msgstr "用户名称"
+
+msgid "The Password of user"
+msgstr "用户密码"
+
+
+msgid "Type Password again"
+msgstr "再次输入密码"
+
+
+msgid "The HOMEDIR of user"
+msgstr "用户主目录"
+
+
+msgid "The System Shell of user"
+msgstr "用户shell"
+
+
+msgid "The system UID of current user"
+msgstr "用户UID"
+
+
+msgid "The system GID of current user"
+msgstr "用户GID"
+
+
+msgid "The Group of user"
+msgstr "用户所属组"
+
+
+msgid "Expiration Date"
+msgstr "有效期限"
+
+
+msgid "Is disabled"
+msgstr "是否禁用"
+
+
+msgid "The Full Name of user"
+msgstr "用户全称"
+
+
+msgid "The E-Mail of user"
+msgstr "用户邮箱"
+
+
+msgid "The Det Address of user"
+msgstr "用户地址"
+
+
+msgid "The Descripiton of current user"
+msgstr "用户简介"
+
+
+msgid "You mast type the same password each time!"
+msgstr "你必须每次输入相同密码！"
+
+#--------------------------------------
+
+msgid "INDEX"
+msgstr "首页"
+
+msgid "USER"
+msgstr "用户"
+
+msgid "GROUP"
+msgstr "用户组"
+
+msgid "QUOTA"
+msgstr "限额"
+
+msgid "STATUS"
+msgstr "资讯"
+
+msgid "SETTING"
+msgstr "设置"
+
+msgid "ADMIN"
+msgstr "管理"
+
+msgid "Welcome, new user. Please log in."
+msgstr "欢迎，新用户，请登录。"
+
+msgid "Welcome"
+msgstr "欢迎"
+
+msgid "login"
+msgstr "登录"
+
+msgid "logout"
+msgstr "注销"
+
+msgid "Checkcode"
+msgstr "验证码"
+
+msgid "e-Mail"
+msgstr "邮箱"
+
+msgid "Submit"
+msgstr "提交"
+
+msgid "This username is already in use.Please choose another."
+msgstr "此用户名已被使用，请输入其它用户名。"
+
+msgid "False"
+msgstr "否"
+
+msgid "True"
+msgstr "是"
+
+msgid "Search"
+msgstr "查找"
+
+msgid "Login"
+msgstr "登录"
+
+
+#--------------------------------------
+#ftpgroup list
+
+msgid "Group List"
+msgstr "用户组列表"
+
+msgid "Edit Group"
+msgstr "编辑用户组"
+
+#msgid "id"
+#msgstr "序号"
+
+msgid "groupname"
+msgstr "组名"
+
+msgid "members"
+msgstr "成员"
+
+msgid "expiration"
+msgstr "失效日期"
+
+msgid "disabled"
+msgstr "禁止"
+
+#--------------------------------------
+#ftpuser list
+
+msgid "User List"
+msgstr "用户列表"
+
+msgid "User Detail"
+msgstr "用户详情"
+
+msgid "Add User"
+msgstr "添加用户"
+
+msgid "Edit User"
+msgstr "编辑用户"
+
+msgid "username"
+msgstr "用户名"
+
+msgid "homedir"
+msgstr "主目录"
+
+msgid "count"
+msgstr "登陆次数"
+
+msgid "lastlogin"
+msgstr "最后登陆"
+
+msgid "lastlogout"
+msgstr "最后退出"
+
+msgid "detail"
+msgstr "详情"
+
+msgid "edit"
+msgstr "编辑"
+
+msgid "del"
+msgstr "删除"
+
+#-----------------------------
+
+#: views/ftpquotalimits.py:89
+msgid "Add New Quota"
+msgstr "添加限额"
+
+#######
+#ftpquota list
+
+msgid "Quota List"
+msgstr "限额列表"
+
+msgid "quota_type"
+msgstr "限额类型"
+
+msgid "per_session"
+msgstr "每个会话"
+
+msgid "limit_type"
+msgstr "限制类型"
+
+msgid "bytes_in_avail"
+msgstr "允许上传字节数"
+
+msgid "bytes_out_avail"
+msgstr "允许下载字节数"
+
+
+msgid "bytes_xfer_avail"
+msgstr "允许传输字节数"
+
+
+msgid "files_in_avail"
+msgstr "允许上传文件数"
+
+msgid "files_out_avail"
+msgstr "允许下载文件数"
+
+msgid "files_xfer_avail"
+msgstr "允许传输文件数"
+
+#--------------------------------------
+#ftpquotatallies list
+
+
+msgid "Add Quota"
+msgstr "添加限额"
+
+msgid "Edit Quota"
+msgstr "编辑限额"
+
+msgid "QuotaTallies List"
+msgstr "限额汇总列表"
+
+
+msgid "bytes_in_used"
+msgstr "已上传字节数"
+
+msgid "bytes_out_used"
+msgstr "已下载字节数"
+
+msgid "bytes_xfer_used"
+msgstr "已传输字节数"
+
+msgid "files_in_used"
+msgstr "已上传文件数"
+
+msgid "files_out_used"
+msgstr "已下载文件数"
+
+msgid "files_xfer_used"
+msgstr "已传输文件数"
+
+
+#--------------------------------------
+# ftpxfterstat list
+
+msgid "Xferstat List"
+msgstr "传输日志"
+
+msgid "file"
+msgstr "文件"
+
+
+msgid "size"
+msgstr "大小"
+
+
+msgid "address_full"
+msgstr "全地址"
+
+msgid "address_ip"
+msgstr "网络地址"
+
+msgid "command"
+msgstr "命令"
+
+msgid "timespent"
+msgstr "耗费时间"
+
+msgid "time"
+msgstr "时间"
+
+
+msgid "cmd"
+msgstr "cmd"
+
+
+
+#--------------------------------------
+#top list
+msgid "Top List"
+msgstr "排行榜"
+
+msgid "Top downloader"
+msgstr "下载排行榜"
+
+msgid "Top uploader"
+msgstr "上传排行榜"
+
+msgid "Top loginer"
+msgstr "登陆排行榜"
+
+#--------------------------------------
+#ftp setting nav
+
+msgid "INTERFACE"
+msgstr "界面"
+
+
+msgid "DATABASE"
+msgstr "数据库"
+
+
+#--------------------------------------
+#ftp status nav
+
+msgid "Del Transfer Log"
+msgstr "删除传输记录"
+
+
+msgid "QuotaTallies"
+msgstr "限额汇总"
+
+
+msgid "Transfer"
+msgstr "传输"
+
+#--------------------------------------
+#ftp setting database"
+
+msgid "db_server_type"
+msgstr "数据库服务器类型"
+
+
+msgid "db_server_host"
+msgstr "数据库服务器地址"
+
+
+msgid "db_server_port"
+msgstr "数据库服务器端口"
+
+
+msgid "db_name"
+msgstr "数据库名称"
+
+
+msgid "db_username"
+msgstr "数据库用户名"
+
+
+msgid "db_password"
+msgstr "数据库密码"
+
+
+#--------------------------------------
+#ftp setting interface
+
+msgid "language"
+msgstr "语言"
+
+
+msgid "site_style"
+msgstr "网站界面"
+
+
+msgid "show_log_items_each_page"
+msgstr "传输日志每页显示数"
+
+
+msgid "show_ftpuser_items_each_page"
+msgstr "用户列表每页显示数"
+
+msgid "show_ftpgroup_items_each_page"
+msgstr "组列表每页显示数"
+
+msgid "show_ftplimit_items_each_page"
+msgstr "限额每页显示数"
+
+
+msgid "show_ftpquota_items_each_page"
+msgstr "限额汇总列表每页显示数"
+
+
+msgid "show_ftpxferstat_items_each_page"
+msgstr "传输日志每页显示数"
+
+
+msgid "show_toplist_items_each_section"
+msgstr "排行榜显示数"
+
+
+
+#--------------------------------------
+# ftp setting filepath
+
+
+msgid "FilePath"
+msgstr "文件路径"
+
+msgid "ProFTPD install path"
+msgstr "ProFTPD 安装路径"
+
+msgid "ftpwho command path"
+msgstr "ftpwho命令路径"
+
+msgid "ProFTPD default data path"
+msgstr "ProFTPD默认数据存储目录"
+
+#--------------------------------------
+#page nav
+
+msgid "first"
+msgstr "首页"
+
+msgid "last"
+msgstr "尾页"
+
+msgid "Next"
+msgstr "下一页"
+
+msgid "Previous"
+msgstr "上一页"
+
+msgid "Total"
+msgstr "共"
+
+
+msgid "Pages"
+msgstr "页"
+
+
+msgid "Items"
+msgstr "项"
+
+
+msgid "Current Page has"
+msgstr "当前页有"
+
+
+msgid "Each Page has"
+msgstr "每页有"
+
+
+msgid "No Item For"
+msgstr "未查找到："
+
+#--------------------------------------
+#ftpctrl
+
+
+msgid "CONSOLE"
+msgstr "控制台"
+

@@ -1,0 +1,20 @@
+{% extends "ftpadmin/status_base.html" %}
+{% load i18n %}
+{% block title %}| {% trans "Top List" %} {% endblock %}
+{% block header %}  {% endblock %}
+
+{% block content %}
+<br /> <br />
+<h2 align="center"> {% trans "Top List" %}  </h2>
+    {% load TopTags  %}
+    <br />
+    <p> &nbsp;>>&nbsp; {% trans "Top downloader" %} : </p>
+    {% get_top_ftp top_downloader 20 %}
+    <br />
+    <p> &nbsp;>>&nbsp; {% trans "Top uploader" %} :</p>
+    {% get_top_ftp top_uploader 20 %}
+    <br />
+    <p> &nbsp;>>&nbsp; {% trans "Top loginer" %} :</p>
+    {% get_top_ftp top_loginer 20 %}
+
+{% endblock %}

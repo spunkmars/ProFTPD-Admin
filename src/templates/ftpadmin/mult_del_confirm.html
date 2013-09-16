@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}| {% trans confirm_title %}{% endblock %}
+{% block header %} {% trans confirm_title %} {% endblock %}
+{% block content %}
+<table align="center">
+    <tr>
+        <td>
+            <p sytle="color:red"> {{ confirm_msg }}</p>
+                <form action="{{ confirm_next_url }}", method="post">
+                <input type="hidden" name="mult_ids" value="{{ mult_ids }}" />
+                <input type="hidden" name="form_type" value="{{ form_type }}" />
+                <input type="hidden" name="" value="" />
+                <input type="submit"  value="{{ confirm_title }}" /> &nbsp;&nbsp;
+                <button type="button" onclick="javascript:window.location.href='{{ confirm_back_url }}'">  {{ confirm_back_title }} </button>
+
+                </form>
+
+        </td>
+    </tr>
+</table>
+
+
+
+{% endblock %}
