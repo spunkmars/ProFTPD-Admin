@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block main_js %}
+        <script type="text/javascript" src="/app_media/js/jquery-1.7.2.js"></script>
+        <script type="text/javascript" src="/app_media/js/jquery.json-2.3.js"></script>
+        <script type="text/javascript" src="/app_media/js/ftpadmin.js"></script>
+
+<script type="text/javascript">
+
+
+$(document).ready(function(){
+
+
+var strr = '{{ field_html_output|safe }}';
+
+$("#select_one").change( function() {
+    var name = $("#select_one").find("option:selected").val();
+    var form_string = '';
+    if ( name != '' ){
+        var value = $.evalJSON( strr )[name]; 
+        form_string = "<tr><td>"+ name + ":</td><td>   " + value + "</td></tr>" ;
+    }
+    $("#selected_action").html(form_string + "\n");
+    //document.getElementById("selected_action").innerHTML= form_string;
+});
+
+
+}); 
+
+</script>
+
+{% endblock %}
+{% block title %}| {% trans "Mult Modify" %} {% endblock %}
+{% block header %} {% trans "Mult Modify" %} {% endblock %}
+{% block content %}
+
+<br /> <br />
+ <form  action="" method="post">
+ <table align="center"><tr><td>
+    Select Action: &nbsp;&nbsp;
+    <select id="select_one" name="select_one" >
+        <option value="" selected="selected">--------</option>
+        {% for action in modify_actions %}
+            <option value="{{ action.value }}" >{{ action.text }}</option>
+        {% endfor %}
+
+    </select>
+    <input type="hidden" name="mult_ids" value="{{ mult_ids }}"  />
+    <input type="hidden" name="form_type" value="mult_modify_form" />
+    <br /><br /> -------------------------------------------------------------------------- <br /><br />
+<table>
+    
+    <span id="selected_action"></span>
+<tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr>
+    <td>
+    <input type="submit" value="Submit">
+    </td>
+    <td>
+    &nbsp;
+    </td>
+    </tr>
+</table>
+</td></tr></table>
+</form>
+
+
+{% endblock %}

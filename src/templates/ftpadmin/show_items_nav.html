@@ -1,0 +1,27 @@
+{% load i18n %}
+<div class="show_items_nav">
+<p style="test-align:right">
+
+{% if item_list.has_previous %}
+    <a href="{{ page_nav_base_url }}{{ url_prefix }}{{ item_list.previous_page_number }}" title="Previous">{% trans "Previous" %}</a>&nbsp;
+    &nbsp;&nbsp;<a href="{{ page_nav_base_url }}{{ url_prefix }}1" title="first">{% trans "first" %}</a>&nbsp;
+{% endif %}
+
+{% for p in page_range %}
+    {% ifequal p item_list.number %}
+        <span ><font color="#FF0000">{{p}} </font></span>
+    {% else %}
+        <a href="{{ page_nav_base_url }}{{ url_prefix }}{{p}}" title="{{p}}">{{p}}</a>
+    {% endifequal %}
+{% endfor %}
+
+{% if item_list.has_next %}
+    &nbsp;<a href="{{ page_nav_base_url }}{{ url_prefix }}{{ paginator.num_pages }}" title="last">{% trans "last" %}</a>&nbsp;&nbsp;
+    <a href="{{ page_nav_base_url }}{{ url_prefix }}{{ item_list.next_page_number }}" title="Next">{% trans "Next" %}</a>&nbsp;
+    
+{% endif %}
+
+
+    <span style="font-size:12px;">&nbsp;{% trans "Total" %} <font color="#67E13E"> {{ paginator.num_pages }}</font> {% trans "Pages" %}, &nbsp;&nbsp; {% trans "Total" %} <font color="#67E13E"> {{ paginator.count }} </font>{% trans "Items" %}, &nbsp;{% trans "Current Page has" %} <font color="#67E13E"> {{ item_list.object_list.count }}</font>&nbsp; {% trans "Items" %}, &nbsp;&nbsp; {% trans "Each Page has" %} <font color="#67E13E"> {{ each_page_items }}</font> {% trans "Items" %}.</span>
+</p>
+</div>

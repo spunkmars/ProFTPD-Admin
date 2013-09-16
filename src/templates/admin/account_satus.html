@@ -1,0 +1,11 @@
+            {% now "Y-m-d H:i:s " %} &nbsp;&nbsp;
+
+            {% if user.is_authenticated %}
+                Welcome , {{ user.username }}. Thanks for logging in KUUUUIIIIPPPPP.
+                
+                |&nbsp;&nbsp; 
+                <a href="/logout/">logout</a>&nbsp;&nbsp;
+            {% else %}
+                Welcome, new user. Please log in. <a href="/login/">login</a>
+
+            {% endif %}

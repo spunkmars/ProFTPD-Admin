@@ -1,0 +1,23 @@
+{% extends "ftpadmin/setting_base.html" %}
+{% block title %}| Define ARGS {% endblock %}
+{% block header %}  Define ARGS {% endblock %}
+
+{% block content %}
+ <br /> <br /> 
+<table>
+    <tr><td height="40">&nbsp;: </td><td>&nbsp;</td></tr>
+</table>
+
+    <form method="post" action="">
+    <table align="center">
+      <tr></td>bytes_in_avail: </td><td> <input type="text" name="bytes_in_avail" value="{{ configuration.LIMIT_DEFAULT_VALUE.bytes_in_avail }}"></td></tr>
+      <tr></td>bytes_out_avail: </td><td> <input type="text" name="bytes_out_avail" value="{{ configuration.LIMIT_DEFAULT_VALUE.bytes_out_avail  }}"></td></tr>
+      <tr></td>bytes_xfer_avail: </td><td> <input type="text" name="bytes_xfer_avail" value="{{ configuration.LIMIT_DEFAULT_VALUE.bytes_xfer_avail  }}"></td></tr>
+      <tr></td>files_in_avail: </td><td> <input type="text" name="files_in_avail" value="{{ configuration.LIMIT_DEFAULT_VALUE.files_in_avail  }}"></td></tr>
+      <tr></td>files_out_avail: </td><td> <input type="text" name="files_out_avail" value="{{ configuration.LIMIT_DEFAULT_VALUE.files_out_avail  }}"></td></tr>
+      <tr></td>files_xfer_avail: </td><td> <input type="text" name="files_xfer_avail" value="{{ configuration.LIMIT_DEFAULT_VALUE.files_xfer_avail  }}"></td></tr>
+      <tr></td>&nbsp;</td><td>&nbsp;</td></tr>
+      <tr></td><input type="submit" value="Submit"></td><td>&nbsp;</td></tr>
+    </table>
+    </form> 
+{% endblock %}

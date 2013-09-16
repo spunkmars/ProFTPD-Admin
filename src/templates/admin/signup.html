@@ -1,0 +1,44 @@
+<html>
+  <head>
+    <title>Sign up for an account</title>
+  </head>
+  <body>
+    <h1>Sign up for an account</h1>
+    <p>Use the form below to register for your new account; all fields are required.</p>
+    <form method="post" action="">
+      {% if form.non_field_errors %}
+      <p><span class="error">
+      {{ form.non_field_errors|join:", " }}
+      </span></p>
+      {% endif %}
+      <p>{% if form.username.errors %}
+      <span class="error">{{ form.username.errors|join:", " }}</span>
+      {% endif %}</p>
+      <p><label for="id_username">Username:</label>
+      {{ form.username }}</p>
+      <p>{% if form.email.errors %}
+      <span class="error">
+      {{ form.email.errors|join:", " }}
+      </span>
+      {% endif %}</p>
+      <p><label for="id_name">Your e-mail address:</label>
+      {{ form.email }}</p>
+      <p>{% if form.password1.errors %}
+      <span class="error">
+      {{ form.passsword1.errors|join:", " }}
+      </span>
+      {% endif %}</p>
+      <p><label for="id_password1">Password:</label>
+      {{ form.password1 }}</p>
+      <p>{% if form.password2.errors %}
+      <span class="error">
+      {{ form.passsword2.errors|join:", " }}
+      </span>
+      {% endif %}</p>
+      <p><label for="id_password2">Password (again, to catch
+      typos): </label>
+      {{ form.password2 }}</p>
+      <p><input type="submit" value="Submit"></p>
+    </form>
+  </body>
+</html>

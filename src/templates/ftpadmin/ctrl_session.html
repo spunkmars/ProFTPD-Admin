@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+        {% block main_css %}
+        <link rel="stylesheet" type="text/css" href="/app_media/css/ftpadmin.css" />
+        <link rel="stylesheet" type="text/css" href="/app_media/js/impromptu/default.css" />
+        {% endblock %}
+
+{% block main_js %}
+        <script type="text/javascript" src="/app_media/js/jquery-1.7.2.js"></script>
+        <script type="text/javascript" src="/app_media/js/jquery.json-2.3.js"></script>
+        <script type="text/javascript" src="/app_media/js/impromptu/jquery-impromptu.js"></script>
+        <script type="text/javascript" src="/app_media/js/django_csrf.js"></script>
+        <script type="text/javascript" src="/app_media/js/ftpadmin.js"></script>
+        <script type="text/javascript"> 
+
+
+$(document).ready(function(){
+
+
+});
+
+
+function switch_input(){
+    var session_t = $("#session_type").val();
+    var input_user_html = '{{ session.user|safe }}';
+    var input_group_html = '{{ session.group|safe }}';
+    var input_class_html = '{{ session.class|safe }}';
+    var input_html = '';
+
+    switch(session_t)
+    {
+        case 'user':
+            input_html = input_user_html;
+            break
+        case 'group':
+            input_html =  input_group_html;
+            break
+        case 'class':
+            input_html =  input_class_html;
+            break
+        default:
+            input_html = input_html;
+    };
+
+    $('#session_input').html(input_html);
+
+
+}
+
+function get_date_string(){
+    var timer = new Date();
+    var cyear = timer.getFullYear();
+    var cmonth = timer.getMonth()+1;
+    var cdate = timer.getDate();
+    var chours = timer.getHours();
+    var cminutes = timer.getMinutes();
+    var cseconds = timer.getSeconds();
+    var cnoon="AM";
+    //if (hours>12){ 
+    //    noon="PM";
+    //    hours=hours-12;
+    //}
+    //if (hours == 0){
+    //    hours = 12;
+    //}
+
+    if (cmonth < 10){
+        cmonth = "0" + cmonth;
+    }
+
+    if (chours < 10){
+        chours = "0" + chours;
+    }
+
+    if (cminutes < 10){
+        cminutes = "0" + cminutes;
+    }
+    
+    if (cseconds < 10){
+        cseconds = "0" + cseconds;
+    }
+    return cyear + '/' + cmonth + '/' + cdate + '  ' + chours + ':' + cminutes + ':' + cseconds;
+
+}
+
+
+
+function get_confirm_msg(){
+    return 'You are trying to kill a  ' + $("#session_type").val() + ' [' + $("#session_value").val() + '] session, Are you sure to kill it ?';
+}
+
+
+function kill_ftp_session(){
+    $.post('{% url ftpctrl_session %}', { session_type: $("#session_type").val(), session_value: $("#session_value").val() },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); });
+}
+
+</script>
+
+
+{% endblock %}
+{% block title %}| {% trans "Kill FTP Session" %} {% endblock %}
+{% block header %} {% trans "Kill FTP Session" %} {% endblock %}
+{% block content %}
+<p> </p>
+<br />
+<table align="center"><tr><td>
+<form name="form1" action="" method="post">
+    <label>Session Type:&nbsp; 
+    <select name="session_type" id="session_type" onchange="javascript:switch_input()">
+        <option value="undefined" selected="selected">---------</option>
+        <option value="user">User</option>
+        <option value="group">Group</option>
+        <option value="class">Class</option>
+    </select>
+    </label>
+&nbsp;&nbsp;
+<span id="session_input">  </span>
+&nbsp;&nbsp;<a href="javascript:openprompt(get_confirm_msg, kill_ftp_session)">Delete Session</a> 
+</form>
+<br /><br /><br />
+
+<span id="MSG">  </span>
+</td></tr></table>
+{% endblock %}

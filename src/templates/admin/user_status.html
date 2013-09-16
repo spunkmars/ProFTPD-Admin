@@ -1,0 +1,27 @@
+{% load i18n %}
+   <!-- fixme -->
+            <div id="user_status">
+                <br />
+                <span style="font-size:35px;font-weight:bold">ProFTPD Admin </span>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                <span style="text-align:right;">
+                {% now "Y-m-d H:i:s " %} &nbsp;&nbsp;
+                {% if request.user.is_authenticated %}  
+                    {% trans "Welcome" %} , {{ request.user.username }}.
+                    <a href="{% url account_logout %}">{% trans "logout" %}</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <form action="/i18n/setlang/" method="post" style="margin:0px;display:inline;"> {% csrf_token %} 
+                        <input name="next" type="hidden" value="" /> 
+                        <select name="language"> <option value="en">English</option> <option value="zh-cn">中文</option> </select> <input type="submit" value="Go" /> 
+                    </form>
+
+                {% else %}
+                    {% trans "Welcome, new user. Please log in." %}  <a href="{% url account_login %}">{% trans "login" %}</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <form action="/i18n/setlang/" method="post" style="margin:0px;display:inline;"> {% csrf_token %} 
+                        <input name="next" type="hidden" value="{% url account_login %}" /> 
+                        <select name="language"><option value="en">English</option> <option value="zh-cn">中文</option> </select> <input type="submit" value="Go" /> 
+                    </form>
+                {% endif %}
+                </span>
+                 <br />
+                 <hr  width="980" color="#D3DBE6" style="border-size:1px" >
+            </div> <!-- end user_status-->
