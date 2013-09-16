@@ -123,7 +123,7 @@ TEMPLATE_DIRS = (
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
     #os.path.join(os.path.dirname(__file__), 'templates').replace('\\','/'),
-    "/data/htdocs/www/proftpd/templates",
+    "/data/htdocs/www/proftpdadmin/src/proftpd/templates",
 )
 
 
