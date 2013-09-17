@@ -69,7 +69,7 @@ def group_list(request):
     show_list_uri = [ {'name':'detail', 'url':'/group/detail', 'title':'detail', 'target':'_self'}, {'name':'edit', 'url':'/group/edit', 'title':'edit', 'target':'_self'}, {'name':'del', 'url':'/group/del', 'title':'del', 'target':'_self'}]
     nav_uri = [{'name':'Add New Group', 'url':reverse('ftpgroup_add_group'), 'title':'Add New Group', 'target':'_self'}]
     template_file = 'ftpadmin/group_list.html'
-    show_field_list = ['id', 'groupname', 'gid', 'members', 'expiration', 'disabled']
+    show_field_list = [ 'groupname', 'gid', 'members', 'expiration' ]
     render_context = show_items(request=request, mult_action_url=reverse('ftpgroup_multiple_done'), show_list_uri = show_list_uri, nav_uri = nav_uri, show_error_url = show_error_url, page_nav_base_url=page_nav_base_url,  model_object=model_object, each_page_items = each_page_items, filter_field = filter_field, template_file = template_file, show_field_list = show_field_list)
     return render_context
 

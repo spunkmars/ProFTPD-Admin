@@ -69,7 +69,7 @@ def acl_list(request):
     show_list_uri = [{'name':'edit', 'url':'/acl/edit', 'title':'edit', 'target':'_self'}, {'name':'del', 'url':'/acl/del', 'title':'del', 'target':'_self'}]
     nav_uri = [{'name':_('Add New ACL'), 'url':reverse('ftpacl_add_acl'), 'title':'add', 'target':'_self'}]
     template_file = 'ftpadmin/acl_list.html'
-    show_field_list = ['id', 'username', 'groupname', 'path', 'read_acl', 'write_acl', 'delete_acl', 'create_acl', 'modify_acl', 'move_acl', 'view_acl', 'navigate_acl']
+    show_field_list = [ 'username', 'groupname', 'path', 'read_acl', 'write_acl', 'delete_acl', 'create_acl', 'modify_acl', 'move_acl', 'view_acl', 'navigate_acl']
     render_context = show_items(request=request, mult_action_url=reverse('ftpacl_multiple_done'), show_list_uri = show_list_uri, nav_uri = nav_uri, show_error_url = show_error_url, page_nav_base_url=page_nav_base_url,  model_object=model_object, each_page_items = each_page_items, filter_field = filter_field, template_file = template_file, show_field_list = show_field_list)
     return render_context
 
