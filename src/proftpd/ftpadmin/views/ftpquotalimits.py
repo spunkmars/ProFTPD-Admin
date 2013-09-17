@@ -69,7 +69,7 @@ def quota_list(request):
     show_list_uri = [{'name':'edit', 'url':'/quota/edit', 'title':'edit', 'target':'_self'}, {'name':'del', 'url':'/quota/del', 'title':'del', 'target':'_self'}]
     nav_uri = [{'name':_('Add New Quota'), 'url':reverse('ftpquotalimit_add_quota'), 'title':'add', 'target':'_self'}]
     template_file = 'ftpadmin/quota_list.html'
-    show_field_list = ['id', 'username', 'quota_type', 'per_session', 'limit_type', 'bytes_in_avail', 'bytes_out_avail', 'bytes_xfer_avail', 'files_in_avail', 'files_out_avail', 'files_xfer_avail']
+    show_field_list = ['username', 'quota_type', 'per_session', 'limit_type', 'bytes_in_avail', 'bytes_out_avail', 'bytes_xfer_avail', 'files_in_avail', 'files_out_avail', 'files_xfer_avail']
     render_context = show_items(request=request, mult_action_url=reverse('ftpquotalimit_multiple_done'), show_list_uri = show_list_uri, nav_uri = nav_uri, show_error_url = show_error_url, page_nav_base_url=page_nav_base_url,  model_object=model_object, each_page_items = each_page_items, filter_field = filter_field, template_file = template_file, show_field_list = show_field_list)
     return render_context
 
