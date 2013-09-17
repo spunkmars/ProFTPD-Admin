@@ -59,7 +59,8 @@
  
 
 function openprompt(confirm_msg, callback){
-    var str = confirm_msg();
+    /* var str = confirm_msg(); */
+    var str = confirm_msg;
     $.prompt(str,{
             buttons: { Ok: true, Cancel: false },
             focus: 1,
