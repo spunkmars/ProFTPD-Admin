@@ -3,6 +3,8 @@
 {% block title %}| {% trans "Group Detail" %}{% endblock %}
 {% block header %} {% trans "Group Detail" %} {% endblock %}
 {% block content %}
+{% load FtpTags %}
+
 
 <table width="800" border="0" align="center" cellpadding="0" cellspacing="0" >
   <tr>
@@ -14,7 +16,7 @@
     <td>
 <table width="800" height="32" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
   <tr>
-    <td height="30" bordercolor="#ECE9D8">&nbsp;>> <em><strong>{{ ftpgroup.groupname }}</strong></em></td>
+    <td height="30" bordercolor="#ECE9D8">&nbsp;>> <em><strong>{{ ftpgroup.groupname }}</strong></em>&nbsp;&nbsp;<a href="{%  get_user_group_url_by_groupname 'edit' ftpgroup.groupname %}">{% trans "edit" %}&nbsp;&nbsp;<a href="{%  get_user_group_url_by_groupname 'del' ftpgroup.groupname %}">{% trans "del" %}</td>
   </tr>
 </table>
 
@@ -56,7 +58,7 @@
 </table>
 <table width="800" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
   <tr>
-    <td height="147">&nbsp;{{ ftpgroup.members }}</td>
+    <td height="147"> {% get_group_member_html_context ftpgroup.members %}</td>
   </tr>
 </table>
     </td>
