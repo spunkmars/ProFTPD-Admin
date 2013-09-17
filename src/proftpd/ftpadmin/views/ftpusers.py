@@ -99,7 +99,7 @@ def user_list(request):
     show_list_uri = [{'name':'detail', 'url':'/user/detail', 'title':'detail', 'target':'_self'}, {'name':'edit', 'url':'/user/edit', 'title':'edit', 'target':'_self'}, {'name':'del', 'url':'/user/del', 'title':'del', 'target':'_self'}]
     nav_uri = [{'name':_('Add New User'), 'url':reverse('ftpuser_add_user'), 'title':'add', 'target':'_self'}]
     template_file = 'ftpadmin/user_list.html'
-    show_field_list = ['id', 'username', 'homedir', 'shell', 'uid', 'gid', 'group', 'count', 'lastlogin', 'lastlogout', 'expiration', 'disabled']
+    show_field_list = ['username', 'homedir', 'group', 'count', 'lastlogin', 'expiration', 'disabled']
     render_context = show_items(request=request, mult_action_url=reverse('ftpuser_multiple_done'), show_list_uri = show_list_uri, nav_uri = nav_uri, show_error_url = show_error_url, page_nav_base_url=page_nav_base_url,  model_object=model_object, each_page_items = each_page_items, filter_field = filter_field, template_file = template_file, show_field_list = show_field_list)
     return render_context
 
