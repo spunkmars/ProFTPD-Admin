@@ -17,7 +17,7 @@ from django.views.decorators.csrf import csrf_exempt
 from proftpd.ftpadmin.settings import SITE_INTERFACE
 from proftpd.ftpadmin.lib.common import initlog
 from proftpd.ftpadmin.lib.view_common import show_items, view_multiple_done, display_confirm_msg
-from proftpd.ftpadmin.lib.ftp_info import get_ftp_info
+from proftpd.ftpadmin.lib.ftp_info import proftpd_info
 from proftpd.ftpadmin.models.ftpquotalimits import  Ftpquotalimits
 from proftpd.ftpadmin.models.ftpxferstat import  Ftpxferstat
 from proftpd.ftpadmin.models.ftpquotatallies import Ftpquotatallies
@@ -36,7 +36,8 @@ from proftpd.ftpadmin.models.ftpquotatallies import Ftpquotatallies
 
 @login_required(redirect_field_name='')
 def show_ftp_info(request):
-    ftp_server_info = get_ftp_info()
+    infos = proftpd_info()
+    ftp_server_info = infos.online_status()
     return render_to_response("ftpadmin/show_ftp_info.html", {'info':ftp_server_info}, context_instance=RequestContext(request))
  
 
@@ -47,7 +48,8 @@ def get_server_info(request):
      
         #import random
         #num = random.randint(1, 100)
-        ftp_server_info = get_ftp_info()
+        infos = proftpd_info()
+        ftp_server_info = infos.online_status()
         #test_id = request.POST.get('test_id', None)
         #msg = str(num)
     else:
