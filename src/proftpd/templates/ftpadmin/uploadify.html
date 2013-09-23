@@ -1,0 +1,60 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+    <head>
+
+        <link rel="stylesheet" type="text/css" href="/app_media/js/uploadify/uploadify.css" /> 
+<!--          <style type="text/css">
+            .uploadifyButton{background-color:#505050;-webkit-border-radius:3px;-moz-border-radius:3px;border-radius:3px;color:#FFF;font:12px Arial, Helvetica, sans-serif;text-align:center;width:100%;padding:8px 0}
+            .uploadify:hover .uploadifyButton{background-color:gray}
+            .uploadifyQueueItem{background-color:#F5F5F5;-webkit-border-radius:3px;-moz-border-radius:3px;border-radius:3px;font:11px Verdana, Geneva, sans-serif;margin-top:5px;max-width:400px;padding:10px}
+            .uploadifyError{background-color:#FDE5DD!important}
+            .uploadifyQueueItem .cancel{float:right}
+            .uploadifyQueue .completed{background-color:#E5E5E5}
+            .uploadifyProgress{background-color:#E5E5E5;margin-top:10px;width:100%}
+            .uploadifyProgressBar{background-color:#09F;height:3px;width:1px}
+        </style>	
+-->
+        <script language="javascript" type="text/javascript" src="/app_media/js/jquery-1.7.2.min.js"></script>
+        <script language="javascript" type="text/javascript" src="/app_media/js/django_csrf.js"></script>
+        <script language="javascript" type="text/javascript" src="/app_media/js/uploadify/jquery.uploadify-3.1.js"></script>
+
+        <script type="text/javascript"> 
+            $(document).ready(function(){
+                //批量上传按钮
+                $('#id_upload').uploadify ({
+                    'fileSizeLimit' : '1GB',
+                    'fileTypeDesc' : 'Image Files', 
+                    'height'   : 25, 
+                    'width': 80,
+                    'swf': '/app_media/images/uploadify/uploadify.swf',
+                    'uploader': '{%url upload_image request.user.id %}', 
+                    'cancelImage' : '/app_media/images/uploadify/uploadify-cancel.png',
+                    'buttonClass': 'btn',
+                    'checkExisting': '{%url check_existing %}',
+                    'removeCompleted': true,
+                    'fileTypeExts': '*.jpg;*.gif;*.png;*.*',
+                    'multi': true,
+                    'auto': false,
+                    'buttonText': '添加图片',
+                    'onUploadSuccess': function (file, data, response) {
+                        $("#instructions").before("<img src='/app_media/images/upload/{{request.user.id}}/"+data+"' />")
+                    }
+                });
+            })
+
+        </script>
+        <title>test for uploadify 3.1 </title>
+    </head>
+    <body>
+
+<p> <span id="instructions"></span></p>
+<p>        <input type="file" id="id_upload" name="upload"/></p>
+<p><a href="javascript:$('#id_upload').uploadify('upload')">上传图片</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+<a href="javascript:$('#id_upload').uploadify('stop')">中止上传</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+<a href="javascript:$('#id_upload').uploadifyClearQueue()">取消上传队列</a> 
+
+</p>
+
+    </body>
+</html>

@@ -1,0 +1,129 @@
+---------------------------------
+
+PATH:
+
+ProFTPD_Admin install path:  /data/htdocs/www/proftpd
+
+
+
+---------------------------------
+
+[root@spunkmars /]# cp -rf  "ProFTPD_Admin - PACKAGE - DIRECTORY"/doc/proftpd.conf  /opt/proftpd/etc/
+
+[root@spunkmars /]# cp "ProFTPD_Admin - PACKAGE - DIRECTORY"/scripts/proftpd  /etc/rc.d/init.d/
+
+[root@spunkmars /]# chmod +x /etc/rc.d/init.d/proftpd
+
+[root@spunkmars /]# chkconfig --add proftpd
+
+
+
+---------------------------------
+
+CREATE DATABASE AND USER:
+
+[root@spunkmars /]# service mysqld start
+
+[root@spunkmars /]# /opt/mysql/bin/mysql -uroot -p
+
+CREATE DATABASE `proftpdadmin` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;
+
+GRANT ALL PRIVILEGES ON  proftpdadmin.* TO 'proftpdadmin'@'localhost' IDENTIFIED BY '123456';
+
+
+
+---------------------------------
+
+Modify you proftpd.conf 's mysql info  to new mysql user and mysql passwd
+
+[root@spunkmars /]# vim /opt/proftpd/etc/proftpd.conf
+
+SQLConnectInfo                  proftpdadmin@localhost proftpdadmin 123456
+
+[root@spunkmars /]# service proftpd start
+
+
+
+---------------------------------
+
+[root@spunkmars /]# useradd www
+
+[root@spunkmars /]# mkdir -pv /data/htdocs/www/proftpd
+
+[root@spunkmars /]# cd /data/htdocs/www/proftpd
+
+[root@spunkmars /]# cp -rf "ProFTPD_Admin - PACKAGE - DIRECTORY"/src/*    ./
+
+[root@spunkmars /]# chown -R www:www /data/htdocs/www/proftpd/ftpadmin/conf
+
+[root@spunkmars /]# chown -R www:www /data/htdocs/www/proftpd/ftpadmin/media
+
+[root@spunkmars /]# touch /tmp/django_debug.log
+
+[root@spunkmars /]# chown -R www:www /tmp/django_debug.log 
+
+[root@spunkmars /]# touch /tmp/django_request.log
+
+[root@spunkmars /]# chown -R www:www /tmp/django_request.log 
+
+[root@spunkmars /]# vim /data/htdocs/www/proftpd/settings.py
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql', # Add 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
+        'NAME': 'proftpdadmin',                      # Or path to database file if using sqlite3.
+        'USER': 'proftpdadmin',                      # Not used with sqlite3.
+        'PASSWORD': '123456',                  # Not used with sqlite3.
+        'HOST': 'localhost',                      # Set to empty string for localhost. Not used with sqlite3.
+        'PORT': '3306',                      # Set to empty string for default. Not used with sqlite3.
+    }
+}
+
+[root@spunkmars /]# /usr/local/python27/bin/python manage.py syncdb
+Creating tables ...
+Creating table auth_permission
+Creating table auth_group_permissions
+Creating table auth_group
+Creating table auth_user_user_permissions
+Creating table auth_user_groups
+Creating table auth_user
+Creating table auth_message
+Creating table django_content_type
+Creating table django_session
+Creating table django_site
+Creating table ftpgroups
+Creating table ftpusers
+Creating table ftpxfer_stat
+Creating table ftpquotatallies
+Creating table ftpquotalimits
+Creating table ftpacl
+Creating table django_admin_log
+
+You just installed Django's auth system, which means you don't have any superusers defined.
+Would you like to create one now? (yes/no): yes    -------------->>>>> Type yes
+Username (Leave blank to use 'root'): admin     -------------->>>>> Type  administrator's name for ProFTPD_Admin  
+E-mail address: spunkmars@spunkmars.org   -------------->>>>> Type your E-mail
+Password:                     -------------->>>>>  Type  administrator's passwrod
+Password (again):             -------------->>>>>  Type password agagin
+Superuser created successfully.
+Installing custom SQL ...
+Installing indexes ...
+
+
+
+---------------------------------
+CONFIG APACHE:
+
+Copy doc/httpd.conf append to your Apache's httpd.conf
+
+[root@spunkmars /]# cat  "ProFTPD_Admin - PACKAGE - DIRECTORY"/doc/httpd.conf >> /opt/apache/conf/httpd.conf
+
+[root@spunkmars /]# service httpd start
+
+
+
+----------------------------------
+
+HOW TO USE ProFTPD Admin:
+
+    SEE: doc/user_guide.txt

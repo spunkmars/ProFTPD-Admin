@@ -1,0 +1,68 @@
+{% extends "ftpadmin/group_base.html" %}
+{% load i18n %}
+{% block title %}| {% trans "Group Detail" %}{% endblock %}
+{% block header %} {% trans "Group Detail" %} {% endblock %}
+{% block content %}
+{% load FtpTags %}
+
+
+<table width="800" border="0" align="center" cellpadding="0" cellspacing="0" >
+  <tr>
+    <td height="21" align="center">&nbsp;</td>
+  </tr>
+</table>
+<table width="805" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
+  <tr>
+    <td>
+<table width="800" height="32" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
+  <tr>
+    <td height="30" bordercolor="#ECE9D8">&nbsp;>> <em><strong>{{ ftpgroup.groupname }}</strong></em>&nbsp;&nbsp;<a href="{%  get_user_group_url_by_groupname 'edit' ftpgroup.groupname %}">{% trans "edit" %}&nbsp;&nbsp;<a href="{%  get_user_group_url_by_groupname 'del' ftpgroup.groupname %}">{% trans "del" %}</td>
+  </tr>
+</table>
+
+<table width="800" height="80" border="0" align="center" cellpadding="0" cellspacing="0" bordercolor="#66CCFF">
+  <tr>
+    <td width="20%" height="39">groupname:</td>
+    <td width="20%">{{ ftpgroup.groupname }}</td>
+    <td colspan="2" rowspan="2">&nbsp;</td>
+    <td width="25%">expiration:</td>
+    <td width="20%">{{ ftpgroup.expiration }}</td>
+  </tr>
+  <tr>
+    <td height="39">gid:</td>
+    <td>{{ ftpgroup.gid }}</td>
+    <td>disabled:</td>
+    <td>{{ ftpgroup.disabled }}</td>
+  </tr>
+</table>
+<table width="800" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
+  <tr>
+    <td height="21" align="center">Description</td>
+  </tr>
+</table>
+<table width="800" height="60" border="0" align="center" cellpadding="0" cellspacing="0" bordercolor="#66CCFF">
+  <tr>
+    <td height="60" colspan="6">{{ ftpgroup.description }}</td>
+    </tr>
+</table>
+<table width="800" border="0" align="center" cellpadding="0" cellspacing="0">
+  <tr>
+    <td height="35">&nbsp;</td>
+  </tr>
+</table>
+
+<table width="800" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
+  <tr>
+    <td height="21" align="center">Members</td>
+  </tr>
+</table>
+<table width="800" border="1" align="center" cellpadding="0" cellspacing="0" bordercolor="#FFFFCC">
+  <tr>
+    <td height="147"> {% get_group_member_html_context ftpgroup.members %}</td>
+  </tr>
+</table>
+    </td>
+  </tr>
+</table>
+
+{% endblock %}

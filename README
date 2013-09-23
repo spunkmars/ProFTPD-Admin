@@ -1,0 +1,53 @@
+
+ProFTPD Admin
+####################################
+ProFTPD Admin make you can manage proftpd  by browser .
+
+
+LICENCE AND COPYRIGHT:
+
+    SEE: LICENSE
+
+RELEASE NOTE:
+
+    SEE: CHANGES
+
+INSTALL DOCUMENT / GUIDE:
+
+    SEE: INSTALL
+
+
+CONFIGURE GUIDE:
+
+    ProFTPD :
+    ----------------------
+    SEE: doc/install_ProFTPD_Admin
+
+    Apache :
+    ----------------------
+    SEE: doc/install_ProFTPD_Admin
+
+
+USER GUIDE:
+
+    SEE: doc/user_guide.txt
+
+
+MANUAL:
+
+    SEE: http://www.spunkmars.org
+
+
+FAQ:
+
+    SEE: http://www.spunkmars.org
+
+
+CONTACT AUTHOR:
+
+    Author: SpunkMars++
+
+    Site:   http://www.spunkmars.org
+
+    E-mail: spunkmars@gmail.com , spunkmars@spunkmars.org
+

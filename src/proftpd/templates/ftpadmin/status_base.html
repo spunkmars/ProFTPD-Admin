@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block ftpstatus_nav %} 
+
+<table width="750"  cellspacing="0" cellpadding="0" align="right" class="table_content_2" >
+    <tr ><td height="20" >&nbsp;</td></tr>
+    <tr ><td height="30" style="background-color:#DCE5EA;border: #6699FF 1px solid;text-align:left">&nbsp;&nbsp;&nbsp;>> Status </td></tr>
+    <!-- <tr ><td style="background-color:#999;border: #6699FF 1px solid;border-top-width: 0px;">&nbsp;</td></tr> -->
+    <tr><td>
+    <ul class="nav">
+        <li><a href="{% url del_transfer_log %}" title="del_transfer_log">{% trans "Del Transfer Log" %}</a></li>
+        <li><a href="{% url ftpquotatallies_list_quota %}" title="QuotaTallies">{% trans "QuotaTallies" %}</a></li>
+        <li><a href="{% url ftp_top %}" title="Top List">{% trans "Top List" %}</a></li>
+        <li><a href="{% url ftpxferstat_list %}" title="Transfer">{% trans "Transfer" %}</a></li>
+    </ul>
+    </td></tr>
+</table>
+
+<p> <br /> </p>
+
+
+
+{% endblock %}

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+        {% block main_css %}
+        <link rel="stylesheet" type="text/css" href="/app_media/css/ftpadmin.css" />
+        <link rel="stylesheet" type="text/css" href="/app_media/js/impromptu/default.css" />
+        {% endblock %}
+
+{% block main_js %}
+        <script type="text/javascript" src="/app_media/js/jquery-1.7.2.js"></script>
+        <script type="text/javascript" src="/app_media/js/jquery.json-2.3.js"></script>
+        <script type="text/javascript" src="/app_media/js/impromptu/jquery-impromptu.js"></script>
+        <script type="text/javascript" src="/app_media/js/ftpadmin.js"></script>
+        <script type="text/javascript"> 
+
+
+
+//这段代码可以自动生成CSRF？
+//$(document).ajaxSend(function(event, xhr, settings) {
+//    function getCookie(name) {
+//        var cookieValue = null;
+//        if (document.cookie && document.cookie != '') {
+//            var cookies = document.cookie.split(';');
+//            for (var i = 0; i < cookies.length; i++) {
+//                var cookie = jQuery.trim(cookies[i]);
+//                // Does this cookie string begin with the name we want?
+//                if (cookie.substring(0, name.length + 1) == (name + '=')) {
+//                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+//                    break;
+//                }
+//            }
+//        }
+//        return cookieValue;
+//    }
+//    function sameOrigin(url) {
+//        // url could be relative or scheme relative or absolute
+//        var host = document.location.host; // host + port
+//        var protocol = document.location.protocol;
+//        var sr_origin = '//' + host;
+//        var origin = protocol + sr_origin;
+//        // Allow absolute or scheme relative URLs to same origin
+//        return (url == origin || url.slice(0, origin.length + 1) == origin + '/') ||
+//            (url == sr_origin || url.slice(0, sr_origin.length + 1) == sr_origin + '/') ||
+//            // or any other URL that isn't scheme relative or absolute i.e relative.
+//            !(/^(\/\/|http:|https:).*/.test(url));
+//    }
+//    function safeMethod(method) {
+//        return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+//    }
+//
+//    if (!safeMethod(settings.type) && sameOrigin(settings.url)) {
+//        xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
+//    }
+//});
+
+var updater;
+var update_time = 1500;
+
+$(document).ready(function(){
+
+updater = {
+    poll: function(){
+    $.ajax({url: "{% get_server_info %}", 
+                type: "POST", 
+                dataType: "json",
+                success: updater.onSuccess,
+                error: updater.onError});
+    },
+    onSuccess: function(data, dataStatus){
+        try{
+            //var info = $.evalJSON(data);
+            var info = data;
+            var html_o = '';
+            html_o += '<p></p><p> Server &nbsp;type:<i> &nbsp;' + info.server_type + ' </i> &nbsp;&nbsp;&nbsp;&nbsp; Master&nbsp; proftpd&nbsp; process:&nbsp; <i> ' + info.server_pid + ' </i></p><p> Up  for &nbsp;&nbsp;&nbsp; -<i> ' +  info.up_day  + '</i>&nbsp;day,&nbsp;&nbsp;-<i>  ' + info.up_hour + ' </i> hrs&nbsp;&nbsp; -<i>  ' + info.up_min + ' </i>min&nbsp; </p><p> Online&nbsp; users：&nbsp;&nbsp;<i>  ' + info.user_count  + '</i> </p>';
+            html_o += '<table cellpadding=\"0\" cellspacing=\"0\" rules=\"all\"  class=\"list_item\">';
+            html_o += '<tr><td><input type=\"button\" onclick=\"checkAll(form1,status)\" value=\"All\" class=\"button_select\"><input type=\"button\" onclick=\"switchAll(form1,status)\" value=\"Not\" class=\"button_select\"><input type=\"button\"  onclick=\"uncheckAll(form1,status)\" value=\"Clear\" class=\"button_select\"></td>';
+            
+            html_o += '<td>pid</td><td>username</td><td>time1</td><td>time2</td><td>cmd</td><td>client_ip</td><td>server_ip</td><td>server_name</td><td>protocol</td><td>location</td></tr>';
+            $.each(info.status,function(key,obj){
+                html_o += '<tr><td><input type=\"checkbox\" value=\"' + obj.username + '\" name=\"checked\" onclick=\"fill_selected_value(form1,status)\" /></td>';
+                html_o += '<td>' + obj.pid + '</td>';
+                html_o += '<td>' + obj.username + '</td>';
+                html_o += '<td>' + obj.time1 + '</td>';
+                html_o += '<td>' + obj.time2 + '</td>';
+                html_o += '<td>' + obj.cmd + '</td>';
+                html_o += '<td>' + obj.client_ip + '</td>';
+                html_o += '<td>' + obj.server_ip + '</td>';
+                html_o += '<td>' + obj.server_name + '</td>';
+                html_o += '<td>' + obj.protocol + '</td>';
+                html_o += '<td>' + obj.location + '</td></tr>';
+            });
+            html_o += '</table>';
+            $("#MSG").html(html_o+"<br />");
+        }
+        catch(e){
+            updater.onError();
+            return;
+        }
+        interval = window.setTimeout(updater.poll, update_time);
+    },
+    onError: function(){
+        console.log("Poll error;");
+    }
+};
+
+
+
+//updater.poll();
+
+
+});
+
+
+
+//function kill_user() {
+
+
+
+
+//};
+
+
+//function set_update_time(){
+    //var t = $("#update_time").val();
+    //update_time = t * 1000;
+    //updater.poll();
+//};
+
+
+function openprompt(){
+    var str = 'you are chsss:::';
+    $.prompt(str,{
+            buttons: { Ok: true, Cancel: false },
+            focus: 1,
+            callback: function(e,v,m,f){ 
+                if (v == true) {
+                    $('#MSG').html('You chose value ' + v);
+                    //updater.poll();
+                }
+            }
+    });
+};
+
+</script>
+
+
+{% endblock %}
+{% block title %}| {% trans "test for ajax" %} {% endblock %}
+{% block header %} {% trans "test for ajax" %} {% endblock %}
+{% block content %}
+<p> </p>
+<br />
+<form name="form1" action="" method="post">
+<span id="MSG">  </span>
+
+<br />
+<a href="javascript:updater.poll()">Show online user</a> &nbsp;&nbsp;&nbsp;&nbsp;
+    <label>Flush time : 
+    <select name="update_time" id="update_time" >
+        <option value="0" selected="selected">---------</option>
+        <option value="0.5">0.5 s</option>
+        <option value="1">1 s</option>
+        <option value="2">2 s</option>
+        <option value="3">3 s</option>
+        <option value="5">5 s</option>
+        <option value="10">10 s</option>
+        <option value="15">15 s</option>
+        <option value="30">30 s</option>
+        <option value="60">60 s</option>
+    </select>
+    </label>
+    <input type="hidden"  value="0" name="select_across" />
+    <button type="submit" title="Run the selected action" name="index" value="0" onclick="javascript:openprompt()">Go</button>&nbsp;&nbsp;&nbsp;&nbsp;<span id="selected_count">0 item selected</span> 
+</form>
+
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "ftpadmin/setting_base.html" %}
+{% load i18n %}
+{% block title %}| {% trans "FilePath" %} {% endblock %}
+{% block header %}  {% endblock %}
+
+{% block content %}
+<br /> <br />
+<table>
+    <tr><td height="40">&nbsp;</td><td>&nbsp;</td></tr>
+</table>
+
+    <form method="post" action="">
+    <table align="center">
+      <th width="250px"><h2>{% trans "FilePath" %}</h2></th>
+      <tr><td>{% trans "ProFTPD install path" %}: </td><td><input type="text" name="proftpd_path" value="{{ configuration.FILE_PATH.proftpd_path }}"></td></tr>
+      <tr><td>{% trans "ftpwho command path" %}: </td><td><input type="text" name="ftpwho_path" value="{{ configuration.FILE_PATH.ftpwho_path  }}"></td></tr>
+      <tr><td>{% trans "ProFTPD default data path" %}: </td><td><input type="text" name="proftpd_default_data_path" value="{{ configuration.FILE_PATH.proftpd_default_data_path  }}"></td></tr>
+      <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+      <tr><td><input type="submit" value={% trans "Submit" %}></td><td>&nbsp;</td></tr>
+    </table>
+    </form>
+{% endblock %}

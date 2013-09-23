@@ -1,0 +1,257 @@
+---------------------------------
+
+REQUIRE ENVIRONMENT:
+
+Base Linux OS ( CentOS, Red Hat Enterprise Linux...)
+
+Mysql 5.x.x and later
+
+Python 2.7.x and later (no support Python 3)
+
+MySQL-python 1.2.3 and later
+
+Apache 2.2.xx and later
+
+mod_python  3.3.1 and later
+
+ProFTPD 1.3.4b and later
+
+Imaging  1.1.7 and later
+
+simplejson
+
+configobj
+
+gettext 0.15.x.x and later
+
+pcre 0.7.0 and later
+
+Django 1.3.1  (only support Django 1.3.1)
+
+
+
+---------------------------------
+
+PATH:
+
+Apache   /opt/httpd
+Mysql    /opt/mysql
+Python   /usr/local/python27
+ProFTPD  /opt/proftpd
+
+
+---------------------------------
+
+INSTALL:
+
+
+[root@spunkmars /]# tar zvxf sqlite-autoconf-3071201.tar.gz
+
+[root@spunkmars /]# cd sqlite-autoconf-3071201
+
+[root@spunkmars /]# ./configure --prefix=/usr/local/sqlite
+
+[root@spunkmars /]# make
+
+[root@spunkmars /]# make install
+
+
+
+[root@spunkmars /]# tar zvxf Python-2.7.3.tgz
+
+[root@spunkmars /]# cd Python-2.7.3
+
+[root@spunkmars /]# LDFLAGS='-L. -L/usr/local/sqlite/lib'  CPPFLAGS='-I/usr/local/sqlite/include' ./configure --prefix=/usr/local/python27  --enable-shared
+
+[root@spunkmars /]# make
+
+[root@spunkmars /]# make install
+
+[root@spunkmars /]# echo '/usr/local/python27/lib' >> /etc/ld.so.conf
+
+[root@spunkmars /]# ldconfig
+
+
+
+[root@spunkmars /]# tar zvxf setuptools-0.6c11.tar.gz
+
+[root@spunkmars /]# cd setuptools-0.6c11
+
+[root@spunkmars /]# /usr/local/python27/bin/python setup.py build
+
+[root@spunkmars /]# /usr/local/python27/bin/python setup.py install
+
+
+
+[root@spunkmars /]# tar zvxf MySQL-python-1.2.3.tar.gz
+
+[root@spunkmars /]# cd MySQL-python-1.2.3
+
+[root@spunkmars /]# echo '/opt/mysql/lib/mysql' >> /etc/ld.so.conf
+
+[root@spunkmars /]# ldconfig 
+
+[root@spunkmars /]# sed -i 's#^\#mysql_config = /usr/local/bin/mysql_config#mysql_config = /opt/mysql/bin/mysql_config#' site.cfg
+
+[root@spunkmars /]# /usr/local/python27/bin/python setup.py build
+
+[root@spunkmars /]# /usr/local/python27/bin/python setup.py install
+
+
+
+[root@spunkmars /]# tar zvxf mod_python-3.3.1.tgz
+
+[root@spunkmars /]# cd mod_python-3.3.1
+
+[root@spunkmars /]# sed -i 's#!(b == APR_BRIGADE_SENTINEL(b) ||#!(b == APR_BRIGADE_SENTINEL(bb) ||#'   src/connobject.c
+
+[root@spunkmars /]# LDFLAGS=-L/usr/local/python27/lib ./configure --with-apxs=/opt/apache/bin/apxs --with-python=/usr/local/python27/bin/python
+
+[root@spunkmars /]# make
+
+[root@spunkmars /]# make install
+
+[root@spunkmars /]# vim /opt/httpd/conf/httpd.conf
+
+Add  " LoadModule python_module modules/mod_python.so " to  httpd.conf
+
+
+
+[root@spunkmars /]# /usr/local/python27/bin/easy_install  simplejson
+
+[root@spunkmars /]# /usr/local/python27/bin/easy_install configobj
+
+[root@spunkmars /]# /usr/local/python27/bin/easy_install south
+
+
+
+[root@spunkmars /]# yum install freetype freetype-devel  zlib  zlib-devel 
+
+[root@spunkmars /]# wget http://effbot.org/downloads/Imaging-1.1.7.tar.gz
+
+[root@spunkmars /]# tar zvxf Imaging-1.1.7.tar.gz
+
+[root@spunkmars /]# cd Imaging-1.1.7
+
+In 64bit OS platform:
+[root@spunkmars /]# sed -i '/# standard locations/a         \\tadd_directory(library_dirs, "/lib64")\n\tadd_directory(library_dirs, "/usr/lib64")\n\tadd_directory(library_dirs, "/usr/local/lib64")\n' setup.py
+
+[root@spunkmars /]# /usr/local/python27/bin/python setup.py build
+
+--------------------------------------------------------------------
+PIL 1.1.7 SETUP SUMMARY
+--------------------------------------------------------------------
+version       1.1.7
+platform      linux2 2.7.3 (default, Apr 12 2013, 10:42:14)
+              [GCC 4.4.7 20120313 (Red Hat 4.4.7-3)]
+--------------------------------------------------------------------
+*** TKINTER support not available
+--- JPEG support available
+--- ZLIB (PNG/ZIP) support available
+--- FREETYPE2 support available
+*** LITTLECMS support not available
+--------------------------------------------------------------------
+
+[root@spunkmars /]# /usr/local/python27/bin/python setup.py install
+
+
+
+[root@spunkmars /]# tar zvxf gettext-0.18.1.1.tar.gz
+
+[root@spunkmars /]# cd gettext-0.18.1.1
+
+[root@spunkmars /]# ./configure --prefix=/usr/local/gettext
+
+[root@spunkmars /]# make
+
+[root@spunkmars /]# make install
+
+[root@spunkmars /]# ln -s /usr/local/gettext/bin/*  /usr/bin/
+
+
+
+[root@spunkmars /]# wget https://www.djangoproject.com/download/1.3.1/tarball/
+
+[root@spunkmars /]# tar xzvf Django-1.3.1.tar.gz
+
+[root@spunkmars /]# cd Django-1.3.1
+
+[root@spunkmars /]# /usr/local/python27/bin/python setup.py install
+
+
+
+[root@spunkmars /]# tar zvxf  pcre-8.31.tar.gz
+
+[root@spunkmars /]# cd pcre-8.31
+
+[root@spunkmars /]# ./configure --prefix=/usr/local/pcre
+
+[root@spunkmars /]# make 
+
+[root@spunkmars /]# make install 
+
+
+
+[root@spunkmars /]# wget ftp://ftp.proftpd.org/distrib/source/proftpd-1.3.4b.tar.gz
+
+[root@spunkmars /]# tar zvxf proftpd-1.3.4b.tar.gz
+
+[root@spunkmars /]# patch -p0 < "ProFTPD_Admin - PACKAGE - DIRECTORY"/doc/proftpd-1.3.4b-extend.patch
+
+[root@spunkmars /]# cd proftpd-1.3.4b
+
+[root@spunkmars /]# LDFLAGS='-L. -L/usr/local/pcre/lib'  CPPFLAGS='-I/usr/local/pcre/include' ./configure --prefix=/opt/proftpd --enable-pcre --enable-ctrls --enable-nls --enable-dso --enable-openssl --with-modules=mod_sql:mod_sql_mysql:mod_quotatab:mod_quotatab_sql:mod_ctrls_admin:mod_auth_cdb:mod_autohost:mod_conf_sql:mod_copy:mod_dbacl:mod_ratio:mod_qos:mod_rewrite   --with-mysql-config=/opt/mysql/bin/mysql_config
+
+[root@spunkmars /]# make
+
+[root@spunkmars /]# make install
+
+
+
+---------------------------------
+
+INSTALL ProFTPD_Admin:
+
+    SEE: doc/install_ProFTPD_Admin
+
+
+
+---------------------------------
+
+TRANSLATE:
+
+[root@spunkmars /]# cd /data/htdocs/www/proftpd/ftpadmin
+
+[root@spunkmars /]# /usr/local/python27/bin/django-admin.py  makemessages -l zh_CN  --settings=/data/htdocs/www/proftpd/settings.py
+
+[root@spunkmars /]# /usr/local/python27/bin/django-admin.py  compilemessages -l zh_CN
+
+
+
+---------------------------------
+
+ADDITION:
+
+[root@spunkmars /]# /usr/local/python27/bin/python /usr/local/python27/bin/easy_install pygooglechart
+
+[root@spunkmars /]# /usr/local/python27/bin/python /usr/local/python27/bin/easy_install django-google-charts
+
+[root@spunkmars /]# /usr/local/python27/bin/python /usr/local/python27/bin/easy_install django-chart-tools
+
+
+
+[root@spunkmars /]# wget http://pypi.python.org/packages/source/d/django-celery/django-celery-2.5.1.tar.gz
+
+[root@spunkmars /]# wget http://www.erlang.org/download/otp_src_R15B.tar.gz
+
+[root@spunkmars /]# wget http://www.rabbitmq.com/releases/rabbitmq-server/v2.8.1/rabbitmq-server-generic-unix-2.8.1.tar.gz
+
+        install document:
+
+        SEE: http://www.spunkmars.org/2012/04/01/linux-erlang-rabbitmq-django-celery-celery/
+
+
+
+
+
+

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+        {% block main_css %}
+        <link rel="stylesheet" type="text/css" href="/app_media/css/ftpadmin.css" />
+        <link rel="stylesheet" type="text/css" href="/app_media/js/impromptu/default.css" />
+        {% endblock %}
+
+{% block main_js %}
+        <script type="text/javascript" src="/app_media/js/jquery-1.7.2.js"></script>
+        <script type="text/javascript" src="/app_media/js/jquery.json-2.3.js"></script>
+        <script type="text/javascript" src="/app_media/js/impromptu/jquery-impromptu.js"></script>
+        <script type="text/javascript" src="/app_media/js/django_csrf.js"></script>
+        <script type="text/javascript" src="/app_media/js/ftpadmin.js"></script>
+        <script type="text/javascript"> 
+
+
+var update_time = 1000;
+var updater;
+var send_data = {'action':'get_ftp_info'};
+
+$(document).ready(function(){
+
+updater = {
+    poll: function(){
+        $.ajax({url: "{% url ftpctrl_status %}", 
+                type: "POST", 
+                dataType: "json",
+                data: send_data,
+                success: updater.onSuccess,
+                error: updater.onError});
+    },
+    onSuccess: function(data, dataStatus){
+        try{
+            //var info = $.evalJSON(data);
+            var info = data;
+            var html_o = '';
+            html_o += '<p></p><p> Server &nbsp;type:<i> &nbsp;' + info.server_type + ' </i> &nbsp;&nbsp;&nbsp;&nbsp; Master&nbsp; proftpd&nbsp; process:&nbsp; <i> ' + info.server_pid + ' </i></p><p> Up  for &nbsp;&nbsp;&nbsp; -<i> ' +  info.up_day  + '</i>&nbsp;day,&nbsp;&nbsp;-<i>  ' + info.up_hour + ' </i> hrs&nbsp;&nbsp; -<i>  ' + info.up_min + ' </i>min&nbsp; </p><p> Online&nbsp; users：&nbsp;&nbsp;<i>  ' + info.user_count  + '</i> </p>';
+            html_o += '<table cellpadding=\"0\" cellspacing=\"0\" rules=\"all\"  class=\"list_item\">';
+            html_o += '<tr class=\"titleRow\"><td><input type=\"button\" onclick=\"checkAll(form1,status)\" value=\"All\" class=\"button_select\"><input type=\"button\" onclick=\"switchAll(form1,status)\" value=\"Not\" class=\"button_select\"><input type=\"button\"  onclick=\"uncheckAll(form1,status)\" value=\"Clear\" class=\"button_select\"></td>';
+            
+            html_o += '<td>pid</td><td>username</td><td>time1</td><td>time2</td><td>cmd</td><td>client_ip</td><td>server_ip</td><td>server_name</td><td>protocol</td><td>location</td></tr>';
+            $.each(info.status,function(key,obj){
+                html_o += '<tr><td><input type=\"checkbox\" value=\"' + obj.username + '\" name=\"checked\" onclick=\"fill_selected_value(form1,status)\" /></td>';
+                html_o += '<td>' + obj.pid + '</td>';
+                html_o += '<td>' + obj.username + '</td>';
+                html_o += '<td>' + obj.time1 + '</td>';
+                html_o += '<td>' + obj.time2 + '</td>';
+                html_o += '<td>' + obj.cmd + '</td>';
+                html_o += '<td>' + obj.client_ip + '</td>';
+                html_o += '<td>' + obj.server_ip + '</td>';
+                html_o += '<td>' + obj.server_name + '</td>';
+                html_o += '<td>' + obj.protocol + '</td>';
+                html_o += '<td>' + obj.location + '</td></tr>';
+            });
+            html_o += '</table>';
+            $("#MSG").html(html_o+"<br />");
+        }
+        catch(e){
+            updater.onError();
+            return;
+        }
+        interval = window.setTimeout(updater.poll, update_time);
+    },
+    onError: function(){
+        console.log("Poll error;");
+    }
+};
+
+
+updater.poll();
+
+
+});
+
+
+
+</script>
+
+
+{% endblock %}
+{% block title %}| {% trans "ProFTPD Server Status " %} {% endblock %}
+{% block header %} {% trans "ProFTPD Server Status " %} {% endblock %}
+{% block content %}
+<p> </p>
+<br />
+<form name="form1" action="" method="post">
+<span id="MSG">  </span>
+
+<br />
+<a href="javascript:updater.poll()">Flush online status</a> &nbsp;&nbsp;&nbsp;&nbsp;
+    <input type="hidden"  value="0" name="select_across" />
+    <span id="selected_count">0 item selected</span> 
+</form>
+
+{% endblock %}

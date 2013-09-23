@@ -1,0 +1,67 @@
+{% load i18n %}
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+
+    <head>
+        {% include "ftpadmin/meta.html" %}
+
+        {% block main_css %}
+        <link rel="stylesheet" type="text/css" href="/app_media/css/ftpadmin.css" />
+        {% endblock %}
+        {% block main_js %}
+        <script type="text/javascript" src="/app_media/js/ftpadmin.js"></script>
+        {% endblock %}
+
+        <title>Proftpd_Admin {% block title %}{% endblock %}</title>
+    </head>
+    <body>
+<div id="wrap"> 
+
+            {% block bodyclass %}
+            {% endblock %}
+    <div id="main">
+
+    {% include "admin/user_status.html" %}
+           
+            {% block nav %}
+                {% include "ftpadmin/main_nav.html" %}
+                <p> &nbsp; </p>
+                {% block ftpstatus_nav %}{% endblock %}
+                {% block ftpsetting_nav %}{% endblock %}
+            {% endblock %} 
+
+            
+   <!-- end fixme -->
+
+
+        <br />
+        <div id="header">
+
+        {% block header %}
+
+
+        {% endblock %}
+        </div><!-- end header-->
+
+        <div id="content">
+            {% block content %}
+            {% endblock %}
+        </div> <!-- end conten-->
+
+        <div id="sidebar">
+            {% block sidebar %}
+            {% endblock %}
+
+        </div><!-- end sidebar-->
+
+   </div> <!-- end main-->
+        <div id="bottom">
+            {% block bottom %}
+                 {% include "ftpadmin/bottom.html" %}
+            {% endblock %}
+        </div>
+</div><!-- end wrap -->
+
+    </body>
+</html>

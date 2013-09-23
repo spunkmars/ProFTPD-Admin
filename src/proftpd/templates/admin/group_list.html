@@ -1,0 +1,25 @@
+{% extends "admin/group_base.html" %}
+{% block title %}| Group List{% endblock %}
+{% block header %} Group List {% endblock %}
+{% block content %}
+
+        <table>
+            <tr>
+                <td><a href="/admin/group/add_group/">Add new Group </a></td>
+            </tr>
+            <tr>
+                <td>ID</td>
+                <td>GroupName</td>
+                <td>Description</td>
+            </tr>
+        {% for group in group_list %}
+            <tr>
+                <td>{{ group.id }}</td>
+                <td>{{ group.groupname }}</td>
+                <td>{{ group.description }}</td>
+                <td><a href="/admin/group/edit_group/{{ group.id }}/">Edit</a></td>
+                <td><a href="/admin/group/del_group/{{ group.id }}/">Del</a></td>
+            </tr>
+        {% endfor %}
+
+{% endblock %}

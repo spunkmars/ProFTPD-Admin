@@ -1,0 +1,25 @@
+{% extends "ftpadmin/setting_base.html" %}
+{% load i18n %}
+{% block title %}| {% trans "DATABASE" %}  {% endblock %}
+{% block header %}  {% endblock %}
+
+{% block content %}
+<br /> <br /> 
+<table>
+    <tr><td height="40">&nbsp;</td><td>&nbsp;</td></tr>
+</table>
+
+    <form method="post" action="">
+    <table align="center">
+      <th width="250px"><h2>{% trans "DATABASE" %}</h2></th>
+      <tr><td>{% trans "db_server_type" %}: </td><td><input type="text" name="db_server_type" value="{{ configuration.DATABASE_SERVER.db_server_type }}"></td></tr>
+      <tr><td>{% trans "db_server_host" %}: </td><td><input type="text" name="db_server_host" value="{{ configuration.DATABASE_SERVER.db_server_host  }}"></td></tr>
+      <tr><td>{% trans "db_server_port" %}: </td><td><input type="text" name="db_server_port" value="{{ configuration.DATABASE_SERVER.db_server_port  }}"></td></tr>
+      <tr><td>{% trans "db_name" %}: </td><td><input type="text" name="db_name" value="{{ configuration.DATABASE_SERVER.db_name  }}"></td></tr>
+      <tr><td>{% trans "db_username" %}: </td><td><input type="text" name="db_username" value="{{ configuration.DATABASE_SERVER.db_username  }}"></td></tr>
+      <tr><td>{% trans "db_password" %}: </td><td><input type="password" name="db_password" value="{{ configuration.DATABASE_SERVER.db_password  }}"></td></tr>
+      <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+      <tr><td><input type="submit" value={% trans "Submit" %}></td><td>&nbsp;</td></tr>
+    </table>
+    </form>
+{% endblock %}

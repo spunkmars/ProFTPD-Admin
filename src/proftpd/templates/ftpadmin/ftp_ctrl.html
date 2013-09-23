@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+        {% block main_css %}
+        <link rel="stylesheet" type="text/css" href="/app_media/css/ftpadmin.css" />
+        <link rel="stylesheet" type="text/css" href="/app_media/js/impromptu/default.css" />
+        {% endblock %}
+
+{% block main_js %}
+        <script type="text/javascript" src="/app_media/js/jquery-1.7.2.js"></script>
+        <script type="text/javascript" src="/app_media/js/jquery.json-2.3.js"></script>
+        <script type="text/javascript" src="/app_media/js/impromptu/jquery-impromptu.js"></script>
+        <script type="text/javascript" src="/app_media/js/django_csrf.js"></script>
+        <script type="text/javascript" src="/app_media/js/ftpadmin.js"></script>
+        <script type="text/javascript"> 
+
+
+$(document).ready(function(){
+
+
+});
+
+
+
+function get_date_string(){
+    var timer = new Date();
+    var cyear = timer.getFullYear();
+    var cmonth = timer.getMonth()+1;
+    var cdate = timer.getDate();
+    var chours = timer.getHours();
+    var cminutes = timer.getMinutes();
+    var cseconds = timer.getSeconds();
+    var cnoon="AM";
+    //if (hours>12){ 
+    //    noon="PM";
+    //    hours=hours-12;
+    //}
+    //if (hours == 0){
+    //    hours = 12;
+    //}
+
+    if (cmonth < 10){
+        cmonth = "0" + cmonth;
+    }
+
+    if (chours < 10){
+        chours = "0" + chours;
+    }
+
+    if (cminutes < 10){
+        cminutes = "0" + cminutes;
+    }
+    
+    if (cseconds < 10){
+        cseconds = "0" + cseconds;
+    }
+    return cyear + '/' + cmonth + '/' + cdate + '  ' + chours + ':' + cminutes + ':' + cseconds;
+
+}
+
+
+function get_confirm_msg(msgs){
+    return 'You are trying to '+ msgs +'!, Are you sure to do it ?';
+}
+
+
+function restart_server(){
+    $.post('{% url ftpctrl_ctrl %}', { ctrl_action: 'restart', ctrl_parameter: ' ' },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); $('#server_status').html(json.server_status); });
+}
+
+function shutdown_server(){
+    $.post('{% url ftpctrl_ctrl %}', { ctrl_action: 'shutdown', ctrl_parameter: ' ' },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); $('#server_status').html(json.server_status);});
+}
+
+
+function down_server(){
+    $.post('{% url ftpctrl_ctrl %}', { ctrl_action: 'down', ctrl_parameter: ' ' },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); $('#server_status').html(json.server_status);});
+}
+
+
+function up_server(){
+    $.post('{% url ftpctrl_ctrl %}', { ctrl_action: 'up', ctrl_parameter: ' ' },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); $('#server_status').html(json.server_status);});
+}
+
+</script>
+
+
+{% endblock %}
+{% block title %}| {% trans "ProFTPD Control" %} {% endblock %}
+{% block header %} {% trans "ProFTPD Control" %} {% endblock %}
+{% block content %}
+<p> </p>
+<br />
+
+<table align="center">
+<tr><td>
+Server Status:&nbsp;&nbsp;<span id="server_status"> {{ server_status }} </span>
+</br>
+</td>
+</tr>
+
+<tr> <td>&nbsp;</br></td></tr>
+<tr><td>
+<form name="form1" action="" method="post">
+    <label>
+    <a href="javascript:openprompt(get_confirm_msg('Down All Server'), down_server)">Down Server</a>
+    </label>
+    &nbsp;&nbsp;
+    <label>
+    <a href="javascript:openprompt(get_confirm_msg('Up All Server'), up_server)">Up Server</a>
+    </label>
+    &nbsp;&nbsp;
+    <label>
+    <a href="javascript:openprompt(get_confirm_msg('Restart Server'), restart_server)">Restart Server</a>
+    </label>
+    &nbsp;&nbsp;
+    <label>
+    <a href="javascript:openprompt(get_confirm_msg('Shutdown Server'), shutdown_server)">Shutdown Server</a>
+    </label>
+
+
+<span id="session_input">  </span>
+
+</form>
+<br /><br /><br />
+
+<span id="MSG">  </span>
+</td></tr></table>
+{% endblock %}
