@@ -1,11 +1,12 @@
 
 ProFTPD Admin
 ####################################
-ProFTPD Admin make you can manage proftpd  by browser .
+ProFTPD Admin make you can manage proftpd  by browser 
 
 
 LICENCE AND COPYRIGHT:
-
+    ProFTPD Admin is released under the BSD License. See the bundled LICENSE file for
+details.
     SEE: LICENSE
 
 RELEASE NOTE:
@@ -51,3 +52,7 @@ CONTACT AUTHOR:
 
     E-mail: spunkmars@gmail.com , spunkmars@spunkmars.org
 
+
+CONTRIBUTING: 
+
+    SEE: CONTRIBUTING
