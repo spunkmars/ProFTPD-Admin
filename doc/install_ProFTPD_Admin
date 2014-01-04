@@ -2,7 +2,7 @@
 
 PATH:
 
-ProFTPD_Admin install path:  /data/htdocs/www/proftpd
+ProFTPD_Admin install path:  /data/htdocs/www/proftpdadmin/src
 
 
 
@@ -48,15 +48,15 @@ SQLConnectInfo                  proftpdadmin@localhost proftpdadmin 123456
 
 [root@spunkmars /]# useradd www
 
-[root@spunkmars /]# mkdir -pv /data/htdocs/www/proftpd
+[root@spunkmars /]# mkdir -pv /data/htdocs/www/proftpdadmin/src
 
-[root@spunkmars /]# cd /data/htdocs/www/proftpd
+[root@spunkmars /]# cd /data/htdocs/www/proftpdadmin/src
 
 [root@spunkmars /]# cp -rf "ProFTPD_Admin - PACKAGE - DIRECTORY"/src/*    ./
 
-[root@spunkmars /]# chown -R www:www /data/htdocs/www/proftpd/ftpadmin/conf
+[root@spunkmars /]# chown -R www:www /data/htdocs/www/proftpdadmin/src/proftpd/ftpadmin/conf
 
-[root@spunkmars /]# chown -R www:www /data/htdocs/www/proftpd/ftpadmin/media
+[root@spunkmars /]# chown -R www:www /data/htdocs/www/proftpdadmin/src/proftpd/ftpadmin/media
 
 [root@spunkmars /]# touch /tmp/django_debug.log
 
@@ -66,7 +66,7 @@ SQLConnectInfo                  proftpdadmin@localhost proftpdadmin 123456
 
 [root@spunkmars /]# chown -R www:www /tmp/django_request.log 
 
-[root@spunkmars /]# vim /data/htdocs/www/proftpd/settings.py
+[root@spunkmars /]# vim /data/htdocs/www/proftpdadmin/src/proftpd/settings.py
 
 DATABASES = {
     'default': {
@@ -114,11 +114,15 @@ Installing indexes ...
 ---------------------------------
 CONFIG APACHE:
 
-Copy doc/httpd.conf append to your Apache's httpd.conf
+    SEE: doc/install_apache_mod_python
 
-[root@spunkmars /]# cat  "ProFTPD_Admin - PACKAGE - DIRECTORY"/doc/httpd.conf >> /opt/apache/conf/httpd.conf
 
-[root@spunkmars /]# service httpd start
+
+---------------------------------
+CONFIG NGINX:
+
+    SEE: doc/install_nginx_uwsgi
+
 
 
 
