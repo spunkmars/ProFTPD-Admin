@@ -1,0 +1,46 @@
+---------------------------------
+
+REQUIRE ENVIRONMENT:
+
+Python 2.7.x and later (no support Python 3)
+
+Apache 2.2.xx and later
+
+mod_python  3.3.1 and later
+
+
+---------------------------------
+
+PATH:
+Apache   /opt/httpd
+Python   /usr/local/python27
+
+---------------------------------
+
+
+
+[root@spunkmars /]# tar zvxf mod_python-3.3.1.tgz
+
+[root@spunkmars /]# cd mod_python-3.3.1
+
+[root@spunkmars /]# sed -i 's#!(b == APR_BRIGADE_SENTINEL(b) ||#!(b == APR_BRIGADE_SENTINEL(bb) ||#'   src/connobject.c
+
+[root@spunkmars /]# LDFLAGS=-L/usr/local/python27/lib ./configure --with-apxs=/opt/apache/bin/apxs --with-python=/usr/local/python27/bin/python
+
+[root@spunkmars /]# make
+
+[root@spunkmars /]# make install
+
+
+
+[root@spunkmars /]# vim /opt/httpd/conf/httpd.conf
+
+Add  " LoadModule python_module modules/mod_python.so " to  httpd.conf
+
+
+---------------------------------
+Copy doc/httpd.conf append to your Apache's httpd.conf
+
+[root@spunkmars /]# cat  "ProFTPD_Admin - PACKAGE - DIRECTORY"/doc/httpd.conf >> /opt/apache/conf/httpd.conf
+
+[root@spunkmars /]# service httpd start

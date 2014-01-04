@@ -1,0 +1,49 @@
+---------------------------------
+
+REQUIRE ENVIRONMENT:
+
+Python 2.7.x and later (no support Python 3)
+
+nginx
+
+uwsgi
+
+
+---------------------------------
+
+PATH:
+Nginx  /opt/nginx
+Python   /usr/local/python27
+
+---------------------------------
+
+[root@spunkmars /]# /usr/local/python27/bin/easy_install uwsgi
+
+[root@spunkmars /]# mkdir -p /data/htdocs/www/proftpdadmin/uwsgi
+
+[root@spunkmars /]# cp "ProFTPD_Admin - PACKAGE - DIRECTORY"/scripts/uwsgi/*   /data/htdocs/www/proftpdadmin/uwsgi/
+
+[root@spunkmars /]# mkdir -p /data/logs/uwsgi/
+
+[root@spunkmars /]# touch /data/logs/uwsgi/uwsgi9090.log
+
+[root@spunkmars /]# chmod +x /data/htdocs/www/proftpdadmin/uwsgi/uwsgi9090
+
+[root@spunkmars /]# ln -sf /data/htdocs/www/proftpdadmin/uwsgi/uwsgi9090 /etc/init.d/uwsgi9090
+
+[root@spunkmars /]# chkconfig --add uwsgi9090
+
+[root@spunkmars /]# chkconfig --level 2345 uwsgi9090 on 
+
+[root@spunkmars /]# /etc/init.d/uwsgi9090 start
+
+[root@spunkmars /]# mkdir -p /opt/nginx/conf/vhost
+
+[root@spunkmars /]# cp "ProFTPD_Admin - PACKAGE - DIRECTORY"/doc/nginx_proftpdadmin.conf   /opt/nginx/conf/vhost/
+
+In nginx.conf, we add the following line into http section.
+
+    include  /opt/nginx/conf/vhost/nginx_proftpdadmin.conf;
+
+
+[root@spunkmars /]# /opt/nginx/sbin/nginx -s reload 

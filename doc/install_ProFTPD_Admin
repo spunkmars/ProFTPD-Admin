@@ -114,11 +114,14 @@ Installing indexes ...
 ---------------------------------
 CONFIG APACHE:
 
-Copy doc/httpd.conf append to your Apache's httpd.conf
+    SEE: doc/install_apache_mod_python
 
-[root@spunkmars /]# cat  "ProFTPD_Admin - PACKAGE - DIRECTORY"/doc/httpd.conf >> /opt/apache/conf/httpd.conf
 
-[root@spunkmars /]# service httpd start
+
+---------------------------------
+CONFIG NGINX:
+
+    SEE: doc/install_nginx_uwsgi
 
 
 
