@@ -45,5 +45,6 @@ In nginx.conf, we add the following line into http section.
 
     include  /opt/nginx/conf/vhost/nginx_proftpdadmin.conf;
 
+[root@spunkmars /]# mkdir -p /data/logs/nginx
 
 [root@spunkmars /]# /opt/nginx/sbin/nginx -s reload 
