@@ -12,6 +12,9 @@ MySQL-python 1.2.3 and later
 
 Apache 2.2.xx and later
 
+Nginx 
+
+
 mod_python  3.3.1 and later
 
 ProFTPD 1.3.4b and later
@@ -21,6 +24,9 @@ Imaging  1.1.7 and later
 simplejson
 
 configobj
+
+uwsgi
+
 
 gettext 0.15.x.x and later
 
@@ -35,6 +41,8 @@ Django 1.3.1  (only support Django 1.3.1)
 PATH:
 
 Apache   /opt/httpd
+
+Nginx    /opt/nginx
 Mysql    /opt/mysql
 Python   /usr/local/python27
 ProFTPD  /opt/proftpd
@@ -97,23 +105,6 @@ INSTALL:
 
 [root@spunkmars /]# /usr/local/python27/bin/python setup.py install
 
-
-
-[root@spunkmars /]# tar zvxf mod_python-3.3.1.tgz
-
-[root@spunkmars /]# cd mod_python-3.3.1
-
-[root@spunkmars /]# sed -i 's#!(b == APR_BRIGADE_SENTINEL(b) ||#!(b == APR_BRIGADE_SENTINEL(bb) ||#'   src/connobject.c
-
-[root@spunkmars /]# LDFLAGS=-L/usr/local/python27/lib ./configure --with-apxs=/opt/apache/bin/apxs --with-python=/usr/local/python27/bin/python
-
-[root@spunkmars /]# make
-
-[root@spunkmars /]# make install
-
-[root@spunkmars /]# vim /opt/httpd/conf/httpd.conf
-
-Add  " LoadModule python_module modules/mod_python.so " to  httpd.conf
 
 
 
