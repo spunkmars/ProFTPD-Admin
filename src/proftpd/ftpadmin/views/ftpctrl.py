@@ -1,4 +1,10 @@
 #coding=utf-8
+import sys
+
+if  sys.version_info >= (2, 6, 0):
+    import json as json
+else:
+    import simplejson as json
 from django.shortcuts import render_to_response, get_object_or_404
 from django.http import HttpResponseRedirect, HttpResponse
 from django.contrib.auth.decorators import login_required
@@ -8,7 +14,6 @@ from django.db.models import Q
 from django.core.urlresolvers import reverse
 from django import forms
 from django.forms import ModelForm
-from django.utils import simplejson 
 from django.utils.translation import ugettext_lazy as _
 from django.forms.widgets import Select
 from django.views.decorators.csrf import csrf_exempt
@@ -61,8 +66,8 @@ def session(request):
             elif session_type == 'class':
                 exec_status = ctrls.kick(k_type='class', k_objective=[session_value])
 
-        return HttpResponse(simplejson.dumps({"status": exec_status}, ensure_ascii = False),
-                mimetype='application/json')
+        return HttpResponse(json.dumps({"status": exec_status}, ensure_ascii = False),
+                content_type='application/json')
     
     
     else:
@@ -86,7 +91,8 @@ def ftp_status(request):
     if request.method == "POST":
         infos = proftpd_info()
         ftp_server_info = infos.online_status()
-        return HttpResponse(simplejson.dumps(ftp_server_info,ensure_ascii = False), mimetype="application/json") 
+        #return HttpResponse(json.dumps(ftp_server_info,ensure_ascii = False), mimetype="application/json") 
+        return HttpResponse(json.dumps(ftp_server_info,ensure_ascii = False), content_type="application/json") 
     else:
         return render_to_response("ftpadmin/ftp_status.html", context_instance=RequestContext(request))
 
@@ -115,7 +121,7 @@ def ftp_ctrl(request):
         server_status = ctrls.status()
         server_status = json_str_filter(s_str=''.join(server_status) )
         logger2.info("server_status = %s" % server_status)
-        return HttpResponse(simplejson.dumps({"status": exec_status, "server_status": server_status}, ensure_ascii = False), mimetype="application/json") 
+        return HttpResponse(json.dumps({"status": exec_status, "server_status": server_status}, ensure_ascii = False), content_type="application/json") 
     else:
         server_status = ctrls.status()
         server_status = json_str_filter(s_str=''.join(server_status) )

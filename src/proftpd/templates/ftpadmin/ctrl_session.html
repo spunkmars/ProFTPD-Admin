@@ -92,7 +92,7 @@ function get_confirm_msg(){
 
 
 function kill_ftp_session(){
-    $.post('{% url ftpctrl_session %}', { session_type: $("#session_type").val(), session_value: $("#session_value").val() },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); });
+    $.post('{% url 'ftpctrl_session' %}', { session_type: $("#session_type").val(), session_value: $("#session_value").val() },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); });
 }
 
 </script>

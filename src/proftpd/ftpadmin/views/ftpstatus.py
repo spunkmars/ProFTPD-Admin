@@ -1,6 +1,13 @@
 #coding=utf-8
 import re
 
+import sys
+
+if  sys.version_info >= (2, 6, 0):
+    import json as json
+else:
+    import simplejson as json
+
 from django.shortcuts import render_to_response, get_object_or_404
 from django.http import HttpResponseRedirect, HttpResponse
 from django.contrib.auth.decorators import login_required
@@ -11,7 +18,6 @@ from django.core.paginator import Paginator, InvalidPage, EmptyPage, PageNotAnIn
 from django.db.models import Q
 from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext_lazy as _
-from django.utils import simplejson 
 from django.views.decorators.csrf import csrf_exempt
 
 from proftpd.ftpadmin.settings import SITE_INTERFACE
@@ -54,7 +60,7 @@ def get_server_info(request):
         #msg = str(num)
     else:
         msg = '失败! 成功一半。。。'
-    return HttpResponse(simplejson.dumps(ftp_server_info,ensure_ascii = False), mimetype="application/json") 
+    return HttpResponse(json.dumps(ftp_server_info,ensure_ascii = False), content_type="application/json") 
 
 
 

@@ -1,9 +1,9 @@
 #from django.conf.urls.defaults import patterns, include, url
-from django.conf.urls.defaults import *
+from django.conf.urls import patterns, url, include
 
 # Uncomment the next two lines to enable the admin:
-from django.contrib import admin
-admin.autodiscover()
+#from django.contrib import admin
+#admin.autodiscover()
 
 #handler403 = 'mysite.views.my_custom_permission_denied_view'
 #handler404 = 'mysite.views.my_custom_404_view'
@@ -20,7 +20,7 @@ urlpatterns = patterns('',
     # Uncomment the next line to enable the admin:
     # url(r'^media/(?P<path>.*)$', 'django.views.static.serve', {'document_root': '/media/'}),
     url(r'^$', 'proftpd.ftpadmin.views.ftpstatus.show_ftp_info', name="site_index"),
-    url(r'^admin/', include(admin.site.urls)),
+#    url(r'^admin/', include(admin.site.urls)),
     url(r'^i18n/setlang', 'proftpd.ftpadmin.views.account.set_language', name="set_language"),
     url(r'^i18n/', include('django.conf.urls.i18n')),
     url(r'^ftpctrl/', include('proftpd.ftpadmin.urls.ftpctrl')),

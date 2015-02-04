@@ -1,19 +1,19 @@
 {% load i18n %}
              {% block nav %}
             <ul id="nav2">
-                <li> <a href="{% url site_index %}" id="current">{% trans "INDEX" %}</a>    </li> 
+                <li> <a href="{% url 'site_index' %}" id="current">{% trans "INDEX" %}</a>    </li> 
             
-                <li> <a href="{% url ftpgctrl_default %}">{% trans "CONSOLE" %}</a></li> 
+                <li> <a href="{% url 'ftpgctrl_default' %}">{% trans "CONSOLE" %}</a></li> 
 
-                <li> <a href="{% url ftpgroup_default %}">{% trans "GROUP" %}</a></li>
+                <li> <a href="{% url 'ftpgroup_default' %}">{% trans "GROUP" %}</a></li>
             
-                <li> <a href="{% url ftpuser_default %}">{% trans "USER" %}</a></li>
+                <li> <a href="{% url 'ftpuser_default' %}">{% trans "USER" %}</a></li>
             
-                <li> <a href="{% url ftpquotalimit_default %}">{% trans "QUOTA" %}</a></li>
+                <li> <a href="{% url 'ftpquotalimit_default' %}">{% trans "QUOTA" %}</a></li>
             
-                <li> <a href="{% url ftpstatus_default %}">{% trans "STATUS" %}</a></li>
+                <li> <a href="{% url 'ftpstatus_default' %}">{% trans "STATUS" %}</a></li>
 
-                <li> <a href="{% url ftpsetting_default %}">{% trans "SETTING" %}</a></li>
+                <li> <a href="{% url 'ftpsetting_default' %}">{% trans "SETTING" %}</a></li>
             
                 <li> <a href="/admin/">{% trans "ADMIN" %}</a></li>
             </ul>

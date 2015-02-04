@@ -1,5 +1,12 @@
 #coding=utf-8
 import re, os, time, random
+import sys
+
+if  sys.version_info >= (2, 6, 0):
+    import json as json
+else:
+    import simplejson as json
+
 from django.core.paginator import Paginator, InvalidPage, EmptyPage, PageNotAnInteger
 from django.db.models import Q
 from django.core.urlresolvers import reverse
@@ -8,7 +15,6 @@ from django.template.loader import render_to_string
 from django.http import HttpResponseRedirect, HttpResponse
 from django.template import RequestContext
 from django.views.decorators.csrf import csrf_exempt
-from django.utils import simplejson
 from django.utils.safestring import mark_safe 
 
 from proftpd.ftpadmin.lib.common import initlog
@@ -226,7 +232,7 @@ def view_multiple_done(request=None, d_model=None, default_url=None, invalid_fie
 
                 
             elif form_data['action'] == 'modify_items':
-                field_html_output = simplejson.dumps( get_model_html_output(model=d_model, invalid_fields=invalid_fields), ensure_ascii = False ).replace('\\', '\\\\')#这里需要修复！
+                field_html_output = json.dumps( get_model_html_output(model=d_model, invalid_fields=invalid_fields), ensure_ascii = False ).replace('\\', '\\\\')#这里需要修复！
                 modify_actions = []
                 modify_actions = get_modify_actions(model=d_model, invalid_fields=invalid_fields)
                 #logger2.info(field_html_output)

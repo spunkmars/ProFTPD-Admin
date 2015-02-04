@@ -23,7 +23,7 @@ $(document).ready(function(){
 
 updater = {
     poll: function(){
-        $.ajax({url: "{% url ftpctrl_status %}", 
+        $.ajax({url: "{% url 'ftpctrl_status' %}", 
                 type: "POST", 
                 dataType: "json",
                 data: send_data,

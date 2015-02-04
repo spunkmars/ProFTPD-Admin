@@ -1,6 +1,6 @@
 #coding=utf-8
 
-from django.db.models.fields import BLANK_CHOICE_DASH, BLANK_CHOICE_NONE
+from django.db.models.fields import BLANK_CHOICE_DASH
 from django import forms
 from django.forms.util import ErrorList
 from django.db.models import Q

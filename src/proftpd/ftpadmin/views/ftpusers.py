@@ -11,7 +11,7 @@ from django.forms import ModelForm
 from django.utils.translation import ugettext_lazy as _
 
 
-from proftpd.ftpadmin.lib.view_common import show_items, view_multiple_done, display_confirm_msg
+from proftpd.ftpadmin.lib.view_common import show_items, view_multiple_done, del_model_items, display_confirm_msg
 from proftpd.ftpadmin.settings import SITE_INTERFACE
 from proftpd.ftpadmin.forms.ftpusers import UserForm
 from proftpd.ftpadmin.models.ftpusers import Ftpuser

@@ -23,7 +23,7 @@
 		<tr><td height="25">&nbsp;</td></tr>
             {{ form.as_table }}
             <tr><th><label for="id_checkcode">{% trans "Checkcode" %}:</label></th><td><input id="id_checkcode" type="text" name="checkcode" maxlength="30" />&nbsp;</td></tr>
-		 <tr><td style="text-align:right" align="right">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img onclick="this.setAttribute('src','{% url account_get_checkcode_image %}?nocache='+Math.random());" onload="if(this.width>this.height){ if(this.width>90)this.width=90; }else{if(this.height>25) this.height=25;}" src="{% url account_get_checkcode_image %}" alt="CheckCode"/></td></tr>
+		 <tr><td style="text-align:right" align="right">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img onclick="this.setAttribute('src','{% url 'account_get_checkcode_image' %}?nocache='+Math.random());" onload="if(this.width>this.height){ if(this.width>90)this.width=90; }else{if(this.height>25) this.height=25;}" src="{% url 'account_get_checkcode_image' %}" alt="CheckCode"/></td></tr>
          <tr><td style="text-align:right"> </td></tr>
          <tr><td height="25">&nbsp;</td></tr>
          <tr><td>

@@ -2,66 +2,66 @@
        {% load NavTags %}
             
             <ul id="nav2">
-                <li> <a href="{% url site_index %}" {% navtagitem "site_index" %}>{% trans "INDEX" %}</a>    </li> 
+                <li> <a href="{% url 'site_index' %}" {% navtagitem "site_index" %}>{% trans "INDEX" %}</a>    </li> 
 
                 <li> 
-                    <a href="{% url ftpctrl_default %}" {% navtagitem "ftpctrl_default" %}>{% trans "CONSOLE" %}</a>
+                    <a href="{% url 'ftpctrl_default' %}" {% navtagitem "ftpctrl_default" %}>{% trans "CONSOLE" %}</a>
                     <ul>
-                        <li>  <a href="{% url ftpctrl_status %}">{% trans "FTP  Status" %}</a></li>
-                        <li>  <a href="{% url ftpctrl_session %}">{% trans "FTP Session" %}</a></li>
-                        <li>  <a href="{% url ftpctrl_ctrl %}">{% trans "FTP Control" %}</a></li>
+                        <li>  <a href="{% url 'ftpctrl_status' %}">{% trans "FTP  Status" %}</a></li>
+                        <li>  <a href="{% url 'ftpctrl_session' %}">{% trans "FTP Session" %}</a></li>
+                        <li>  <a href="{% url 'ftpctrl_ctrl' %}">{% trans "FTP Control" %}</a></li>
                     </ul>
 
                 </li>
 
                 <li> 
-                    <a href="{% url ftpgroup_default %}" {% navtagitem "ftpgroup_default" %}>{% trans "GROUP" %}</a>
+                    <a href="{% url 'ftpgroup_default' %}" {% navtagitem "ftpgroup_default" %}>{% trans "GROUP" %}</a>
                     <ul>
-                        <li>  <a href="{% url ftpgroup_add_group %}">{% trans "Add New Group" %}</a></li>
-                        <li>  <a href="{% url ftpgroup_list_group %}">{% trans "Group List" %}</a></li>
+                        <li>  <a href="{% url 'ftpgroup_add_group' %}">{% trans "Add New Group" %}</a></li>
+                        <li>  <a href="{% url 'ftpgroup_list_group' %}">{% trans "Group List" %}</a></li>
                     </ul>
                 </li>
-                <li> <a href="{% url ftpuser_default %}" {% navtagitem "ftpuser_default" %} >{% trans "USER" %}</a>
+                <li> <a href="{% url 'ftpuser_default' %}" {% navtagitem "ftpuser_default" %} >{% trans "USER" %}</a>
                     <ul>
-                        <li>  <a href="{% url ftpuser_add_user %}">{% trans "Add New User" %}</a></li>
-                        <li>  <a href="{% url ftpuser_list_user %}">{% trans "User List" %}</a></li>
+                        <li>  <a href="{% url 'ftpuser_add_user' %}">{% trans "Add New User" %}</a></li>
+                        <li>  <a href="{% url 'ftpuser_list_user' %}">{% trans "User List" %}</a></li>
                     </ul>
                 </li>
-                <li> <a href="{% url ftpquotalimit_default %}" {% navtagitem "ftpquotalimit_default" %}>{% trans "QUOTA" %}</a>
+                <li> <a href="{% url 'ftpquotalimit_default' %}" {% navtagitem "ftpquotalimit_default" %}>{% trans "QUOTA" %}</a>
                     <ul>
-                        <li>  <a href="{% url ftpquotalimit_add_quota %}?add_type=user">{% trans "Add New Quota" %}</a>
+                        <li>  <a href="{% url 'ftpquotalimit_add_quota' %}?add_type=user">{% trans "Add New Quota" %}</a>
 <!--                            <ul>
-                                <li>  <a href="{% url ftpquotalimit_add_quota %}?add_type=all">{% trans "Add Quota For All" %}</a></li>
-                                <li>  <a href="{% url ftpquotalimit_add_quota %}?add_type=class">{% trans "Add Quota For Class" %}</a></li>
-                                <li>  <a href="{% url ftpquotalimit_add_quota %}?add_type=group">{% trans "Add Quota For Group" %}</a></li>
-                                <li>  <a href="{% url ftpquotalimit_add_quota %}?add_type=user">{% trans "Add Quota For User" %}</a></li>
+                                <li>  <a href="{% url 'ftpquotalimit_add_quota' %}?add_type=all">{% trans "Add Quota For All" %}</a></li>
+                                <li>  <a href="{% url 'ftpquotalimit_add_quota' %}?add_type=class">{% trans "Add Quota For Class" %}</a></li>
+                                <li>  <a href="{% url 'ftpquotalimit_add_quota' %}?add_type=group">{% trans "Add Quota For Group" %}</a></li>
+                                <li>  <a href="{% url 'ftpquotalimit_add_quota' %}?add_type=user">{% trans "Add Quota For User" %}</a></li>
                             </ul>  
 -->
                         </li>
-                        <li>  <a href="{% url ftpquotalimit_list_quota %}">{% trans "Quota List" %}</a></li>
+                        <li>  <a href="{% url 'ftpquotalimit_list_quota' %}">{% trans "Quota List" %}</a></li>
                     </ul>
                 </li>
-                <li> <a href="{% url ftpacl_default %}" {% navtagitem "ftpacl_default" %}>{% trans "ACL" %}</a>
+                <li> <a href="{% url 'ftpacl_default' %}" {% navtagitem "ftpacl_default" %}>{% trans "ACL" %}</a>
                     <ul>
-                        <li>  <a href="{% url ftpacl_add_acl %}">{% trans "Add ACL" %}</a></li>
-                        <li>  <a href="{% url ftpacl_list_acl %}">{% trans "ACL List" %}</a></li>
+                        <li>  <a href="{% url 'ftpacl_add_acl' %}">{% trans "Add ACL" %}</a></li>
+                        <li>  <a href="{% url 'ftpacl_list_acl' %}">{% trans "ACL List" %}</a></li>
                     </ul>
                 </li>
-                <li> <a href="{% url ftpstatus_default %}" {% navtagitem "ftpstatus_default" %}>{% trans "STATUS" %}</a>
+                <li> <a href="{% url 'ftpstatus_default' %}" {% navtagitem "ftpstatus_default" %}>{% trans "STATUS" %}</a>
                     <ul>
-                        <li>  <a href="{% url ftpxferstat_list %}">{% trans "Xferstat List" %}</a></li>
-                        <li>  <a href="{% url ftpquotatallies_list_quota %}">{% trans "QuotaTallies List" %}</a></li>
-                        <li>  <a href="{% url ftp_top %}">{% trans "Top List" %}</a></li>
-                        <li>  <a href="{% url del_transfer_log %}">{% trans "Del Transfer Log" %}</a></li>
+                        <li>  <a href="{% url 'ftpxferstat_list' %}">{% trans "Xferstat List" %}</a></li>
+                        <li>  <a href="{% url 'ftpquotatallies_list_quota' %}">{% trans "QuotaTallies List" %}</a></li>
+                        <li>  <a href="{% url 'ftp_top' %}">{% trans "Top List" %}</a></li>
+                        <li>  <a href="{% url 'del_transfer_log' %}">{% trans "Del Transfer Log" %}</a></li>
                     </ul>
                 </li>
 
-                <li> <a href="{% url ftpsetting_default %}" {% navtagitem "ftpsetting_default" %} >{% trans "SETTING" %}</a>
+                <li> <a href="{% url 'ftpsetting_default' %}" {% navtagitem "ftpsetting_default" %} >{% trans "SETTING" %}</a>
                     <ul>
-                        <li>  <a href="{% url ftpsetting_define_interface %}">{% trans "INTERFACE" %}</a></li>
-                        <li>  <a href="{% url ftpsetting_define_database %}">{% trans "DATABASE" %}</a></li>
-                        <li>  <a href="{% url ftpsetting_define_proftpd %}">{% trans "ProFTPD" %}</a></li>
-                        <li>  <a href="{% url ftpsetting_define_filepath %}">{% trans "FilePath" %}</a></li>
+                        <li>  <a href="{% url 'ftpsetting_define_interface' %}">{% trans "INTERFACE" %}</a></li>
+                        <li>  <a href="{% url 'ftpsetting_define_database' %}">{% trans "DATABASE" %}</a></li>
+                        <li>  <a href="{% url 'ftpsetting_define_proftpd' %}">{% trans "ProFTPD" %}</a></li>
+                        <li>  <a href="{% url 'ftpsetting_define_filepath' %}">{% trans "FilePath" %}</a></li>
                         <li> <a href="/admin/">{% trans "ADMIN" %}</a></li>
                     </ul>
                 </li>

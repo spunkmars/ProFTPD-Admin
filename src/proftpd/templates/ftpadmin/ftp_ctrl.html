@@ -65,21 +65,21 @@ function get_confirm_msg(msgs){
 
 
 function restart_server(){
-    $.post('{% url ftpctrl_ctrl %}', { ctrl_action: 'restart', ctrl_parameter: ' ' },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); $('#server_status').html(json.server_status); });
+    $.post('{% url 'ftpctrl_ctrl' %}', { ctrl_action: 'restart', ctrl_parameter: ' ' },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); $('#server_status').html(json.server_status); });
 }
 
 function shutdown_server(){
-    $.post('{% url ftpctrl_ctrl %}', { ctrl_action: 'shutdown', ctrl_parameter: ' ' },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); $('#server_status').html(json.server_status);});
+    $.post('{% url 'ftpctrl_ctrl' %}', { ctrl_action: 'shutdown', ctrl_parameter: ' ' },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); $('#server_status').html(json.server_status);});
 }
 
 
 function down_server(){
-    $.post('{% url ftpctrl_ctrl %}', { ctrl_action: 'down', ctrl_parameter: ' ' },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); $('#server_status').html(json.server_status);});
+    $.post('{% url 'ftpctrl_ctrl' %}', { ctrl_action: 'down', ctrl_parameter: ' ' },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); $('#server_status').html(json.server_status);});
 }
 
 
 function up_server(){
-    $.post('{% url ftpctrl_ctrl %}', { ctrl_action: 'up', ctrl_parameter: ' ' },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); $('#server_status').html(json.server_status);});
+    $.post('{% url 'ftpctrl_ctrl' %}', { ctrl_action: 'up', ctrl_parameter: ' ' },function(json) {$("#MSG").append(get_date_string() + '&nbsp;>>&nbsp;&nbsp;' + json.status + '<br /><br />\n'); $('#server_status').html(json.server_status);});
 }
 
 </script>

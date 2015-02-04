@@ -4,7 +4,7 @@ from django import forms
 from django.forms.fields import DateField, ChoiceField, MultipleChoiceField
 from django.forms.widgets import RadioSelect, CheckboxSelectMultiple, SplitDateTimeWidget
 from django.forms.extras.widgets import SelectDateWidget
-from django.db.models.fields import BLANK_CHOICE_DASH, BLANK_CHOICE_NONE
+from django.db.models.fields import BLANK_CHOICE_DASH
 from django.utils.translation import ugettext_lazy as _
 
 from proftpd.ftpadmin.lib.form_common import newModelForm, set_select_choice, EXPIRATION_YEAR_CHOICES
