@@ -1,6 +1,13 @@
 ProFTPD Admin
 
 
+2015/02/4
+-------------------
+release v 0.8.0
+
+1 support Django 1.7
+
+
 2012/07/24
 -------------------
 release v 0.7.5
